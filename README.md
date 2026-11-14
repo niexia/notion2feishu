@@ -24,6 +24,9 @@ lark-cli auth login --domain docs,drive,wiki,base
 
 # 3. 迁移
 notion2feishu
+
+# 或者不安装，直接用 npx（需要 Node + Python 3.9+）
+npx --yes github:niexia/notion2feishu
 ```
 
 `notion2feishu` 不带参数时会：
@@ -69,6 +72,16 @@ Notion 导出
 ## 安装
 
 要求：Python 3.9+，且已安装并配置 [`lark-cli`](https://github.com/larksuite/lark-cli)。
+
+### npx（适合已有 Node 的机器）
+
+```bash
+npx --yes github:niexia/notion2feishu
+# 发布到 npm 后：npx --yes notion2feishu
+```
+
+它只是一个 **npm 启动器**：会调用本机的 Python 3.9+ 运行仓库里的 Python 包，
+所以仍然需要 `lark-cli`，并不是把 Python 依赖省掉。
 
 ### pipx（推荐）
 

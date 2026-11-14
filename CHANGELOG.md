@@ -8,4 +8,5 @@
 - 页间链接在全部文档建完后回填为飞书 URL。
 - `--dry-run`、`--resume`、`--fresh`、`--limit`。
 - 支持 `.zip` 和目录作为输入。
+- 提供 `npx github:niexia/notion2feishu` 启动器（仍需本机 Python 3.9+）。
 - MIT License。

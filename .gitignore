@@ -9,3 +9,4 @@ notion2feishu-work/
 state.json
 *.final.md
 .DS_Store
+*.tgz

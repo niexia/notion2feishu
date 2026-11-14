@@ -1,0 +1,38 @@
+{
+  "name": "notion2feishu",
+  "version": "0.1.0",
+  "description": "Migrate Notion exports to Feishu docs with hierarchy, images and links preserved.",
+  "license": "MIT",
+  "bin": {
+    "notion2feishu": "bin/notion2feishu.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "scripts": {
+    "test": "node bin/notion2feishu.js version"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/niexia/notion2feishu.git"
+  },
+  "homepage": "https://github.com/niexia/notion2feishu",
+  "bugs": {
+    "url": "https://github.com/niexia/notion2feishu/issues"
+  },
+  "keywords": [
+    "notion",
+    "feishu",
+    "lark",
+    "migration",
+    "markdown",
+    "wiki",
+    "cli"
+  ]
+}
