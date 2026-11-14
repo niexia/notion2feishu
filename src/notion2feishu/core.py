@@ -522,7 +522,7 @@ def cmd_push(args: argparse.Namespace) -> int:
     if not manifest_path.exists():
         raise SystemExit(f"找不到 {manifest_path}，先运行 prepare")
 
-    if not shutil.which("lark-cli"):
+    if not args.dry_run and not shutil.which("lark-cli"):
         raise SystemExit("找不到 lark-cli，请先安装并完成 auth login")
 
     if not args.dry_run:
