@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>notion2feishu · Notion 迁移到飞书</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --text: #1f2329;
+    --muted: #646a73;
+    --line: #e5e6eb;
+    --blue: #3370ff;
+    --blue-weak: #e8f0ff;
+    --green: #2ea121;
+    --red: #d83931;
+    --orange: #de7802;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 28px; background: var(--card); border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 5;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; }
+  .logo {
+    width: 28px; height: 28px; border-radius: 8px; background: var(--blue);
+    color: #fff; display: grid; place-items: center; font-size: 14px;
+  }
+  .pill { padding: 4px 10px; border-radius: 999px; font-size: 12px; background: #f2f3f5; color: var(--muted); }
+  .pill.ok { background: #e8f7e6; color: var(--green); }
+  .pill.bad { background: #fde8e7; color: var(--red); }
+  main { max-width: 1180px; margin: 0 auto; padding: 22px 20px 60px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 20px; margin-bottom: 16px;
+  }
+  .card h2 { margin: 0 0 4px; font-size: 15px; }
+  .card .sub { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
+  .grid { display: grid; grid-template-columns: 1.25fr .9fr; gap: 16px; align-items: start; }
+  @media (max-width: 880px) { .grid { grid-template-columns: 1fr; } }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  input[type=text], input[type=password] {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px;
+    font: inherit; background: #fff; color: var(--text);
+  }
+  input:focus { outline: 2px solid var(--blue-weak); border-color: var(--blue); }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  button {
+    border: 0; border-radius: 8px; padding: 9px 16px; font: inherit; cursor: pointer;
+    background: var(--blue); color: #fff; font-weight: 600;
+  }
+  button.secondary { background: #f2f3f5; color: var(--text); }
+  button.ghost { background: transparent; color: var(--blue); padding: 4px 6px; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .tree { max-height: 420px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+  .tree ul { list-style: none; margin: 0; padding-left: 18px; }
+  .tree > ul { padding-left: 4px; }
+  .tree li { margin: 2px 0; }
+  .node { display: flex; align-items: center; gap: 7px; padding: 5px 6px; border-radius: 6px; }
+  .node:hover { background: #fafbfc; }
+  .node input { accent-color: var(--blue); }
+  .node-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .node-count { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .node.child { padding-left: 24px; color: var(--muted); }
+  .node.child .node-title { color: var(--muted); }
+  .empty { color: var(--muted); padding: 18px; text-align: center; }
+  .summary { background: #f8f9fb; border-radius: 8px; padding: 12px 14px; margin: 12px 0; font-size: 13px; }
+  .summary b { color: var(--blue); }
+  .radio-row { display: flex; gap: 16px; margin-bottom: 12px; }
+  .radio-row label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  .hint { color: var(--muted); font-size: 12px; }
+  .warn { color: var(--orange); font-size: 12px; }
+  .progress-wrap { margin: 10px 0 6px; }
+  .progress { height: 8px; background: #eef0f3; border-radius: 999px; overflow: hidden; }
+  .progress > div { height: 100%; width: 0; background: var(--blue); transition: width .4s ease; }
+  .job-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .job-status { font-size: 12px; color: var(--muted); }
+  pre.logs {
+    background: #16181d; color: #d7dae0; border-radius: 8px; padding: 12px;
+    max-height: 260px; overflow: auto; font-size: 12px; line-height: 1.5; white-space: pre-wrap;
+  }
+  details summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-top: 10px; }
+  .links a { display: block; padding: 6px 0; color: var(--blue); text-decoration: none; }
+  .links a:hover { text-decoration: underline; }
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
+  .stat { background: #f8f9fb; border-radius: 8px; padding: 10px 12px; }
+  .stat b { display: block; font-size: 18px; }
+  .stat span { color: var(--muted); font-size: 12px; }
+  .toast {
+    position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+    background: #1f2329; color: #fff; padding: 10px 16px; border-radius: 8px;
+    font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 20;
+  }
+  .toast.show { opacity: 1; }
+  .hidden { display: none !important; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 20px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="logo">N</div> notion2feishu</div>
+  <div class="row">
+    <span id="notionPill" class="pill">Notion 未连接</span>
+    <span id="larkPill" class="pill">飞书未授权</span>
+    <button id="disconnectBtn" class="ghost hidden">断开</button>
+  </div>
+</header>
+
+<main>
+  <section id="connectCard" class="card">
+    <h2>① 连接 Notion</h2>
+    <div class="sub">
+      在 <a href="https://www.notion.so/my-integrations" target="_blank" rel="noreferrer">Notion Integrations</a>
+      创建 Internal Integration，复制 token；然后把 integration 连接到你的根页面（••• → Connections）。
+    </div>
+    <div class="field">
+      <label>Notion Integration Token</label>
+      <input id="tokenInput" type="password" placeholder="ntn_..." autocomplete="off">
+    </div>
+    <button id="connectBtn">连接 Notion</button>
+    <div id="connectMsg" class="hint" style="margin-top:8px"></div>
+  </section>
+
+  <div class="grid">
+    <section id="sourceCard" class="card">
+      <h2>② 选择页面</h2>
+      <div class="sub">扫描 integration 可见的顶层页面；当前版本按顶层页面选择，子页面随父页面一起迁移。</div>
+      <div class="row" style="margin-bottom:10px">
+        <button id="scanBtn" class="secondary">扫描 Notion</button>
+        <button id="selectAllBtn" class="ghost">全选</button>
+        <button id="selectNoneBtn" class="ghost">全不选</button>
+        <span id="scanMsg" class="hint"></span>
+      </div>
+      <div id="tree" class="tree"><div class="empty">连接后点击「扫描 Notion」</div></div>
+      <div id="summary" class="summary hidden"></div>
+    </section>
+
+    <section id="targetCard" class="card">
+      <h2>③ 选择目标</h2>
+      <div class="sub">默认进入「我的文档库」，并创建一个总容器节点，避免污染根目录。</div>
+      <div class="radio-row">
+        <label><input type="radio" name="target" value="wiki" checked> 我的文档库 / 知识库</label>
+        <label><input type="radio" name="target" value="drive"> 云盘文件夹</label>
+      </div>
+      <div id="wikiFields">
+        <div class="field">
+          <label>知识库 space_id（个人文档库用 my_library）</label>
+          <input id="spaceId" type="text" value="my_library">
+        </div>
+      </div>
+      <div id="driveFields" class="hidden">
+        <div class="field">
+          <label>云盘目标文件夹 token（fldcn...）</label>
+          <input id="folderToken" type="text" placeholder="fldcn...">
+        </div>
+      </div>
+      <div class="field">
+        <label>飞书域名（用于回填页间链接）</label>
+        <input id="baseUrl" type="text" placeholder="https://acme.feishu.cn">
+      </div>
+      <div class="field">
+        <label>容器节点 / 文件夹名称</label>
+        <input id="containerTitle" type="text">
+      </div>
+      <div id="targetHint" class="hint"></div>
+      <button id="startBtn" style="width:100%;margin-top:12px">开始迁移</button>
+      <div class="warn" id="startWarn" style="margin-top:8px"></div>
+    </section>
+  </div>
+
+  <section id="jobCard" class="card hidden">
+    <div class="job-head">
+      <div>
+        <h2 id="jobTitle">迁移进度</h2>
+        <div class="job-status" id="jobStatus"></div>
+      </div>
+      <div class="pill" id="jobPill">运行中</div>
+    </div>
+    <div class="progress-wrap"><div class="progress"><div id="progressBar"></div></div></div>
+    <div class="hint" id="jobMessage"></div>
+    <div id="resultBox" class="hidden">
+      <div class="stat-grid">
+        <div class="stat"><b id="statPages">0</b><span>页面</span></div>
+        <div class="stat"><b id="statImages">0</b><span>图片</span></div>
+        <div class="stat"><b id="statDbs">0</b><span>数据库（仅链接）</span></div>
+      </div>
+      <div id="rootLinks" class="links"></div>
+      <div id="resultErrors" class="warn"></div>
+    </div>
+    <details>
+      <summary>查看日志</summary>
+      <pre class="logs" id="logBox"></pre>
+    </details>
+  </section>
+</main>
+
+<footer>notion2feishu · 本地运行，token 不上传第三方</footer>
+<div id="toast" class="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const state = { config: null, roots: [], selected: new Set(), jobId: null, timer: null };
+
+function toast(message) {
+  const el = $('toast');
+  el.textContent = message;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 3200);
+}
+
+async function api(path, options = {}) {
+  const res = await fetch(path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  let data = {};
+  try { data = await res.json(); } catch (e) { data = {}; }
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+function setPills() {
+  const notionOk = !!(state.config && state.config.notion_connected);
+  const larkOk = !!(state.config && state.config.lark_user_ready);
+  $('notionPill').textContent = notionOk ? `Notion 已连接 ${state.config.notion_hint || ''}` : 'Notion 未连接';
+  $('notionPill').className = 'pill ' + (notionOk ? 'ok' : '');
+  $('larkPill').textContent = larkOk ? '飞书已授权' : '飞书未授权';
+  $('larkPill').className = 'pill ' + (larkOk ? 'ok' : 'bad');
+  $('disconnectBtn').classList.toggle('hidden', !notionOk);
+  $('connectCard').classList.toggle('hidden', notionOk);
+  if (notionOk) {
+    $('connectMsg').textContent = '已连接；如需更换 token 点右上角「断开」。';
+  }
+  $('startWarn').textContent = larkOk ? '' : '飞书 user 身份未登录：先在终端运行 lark-cli auth login --domain docs,drive,wiki,base';
+}
+
+async function loadConfig() {
+  state.config = await api('/api/config');
+  setPills();
+  $('spaceId').value = state.config.space_id || 'my_library';
+  $('baseUrl').value = state.config.base_url || '';
+  if (!$('containerTitle').value) {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    $('containerTitle').value = `Notion 导入 ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+  const target = state.config.target === 'drive' ? 'drive' : 'wiki';
+  document.querySelector(`input[name=target][value=${target}]`).checked = true;
+  toggleTarget();
+}
+
+function toggleTarget() {
+  const target = document.querySelector('input[name=target]:checked').value;
+  $('wikiFields').classList.toggle('hidden', target !== 'wiki');
+  $('driveFields').classList.toggle('hidden', target !== 'drive');
+  $('targetHint').textContent = target === 'wiki'
+    ? '会创建知识库节点；个人文档库不需要额外权限。'
+    : '需要在飞书云盘先建一个文件夹，并填入它的 fldcn token。';
+}
+
+async function connect() {
+  const token = $('tokenInput').value.trim();
+  if (!token) return toast('请填入 Notion token');
+  $('connectBtn').disabled = true;
+  $('connectMsg').textContent = '验证中…';
+  try {
+    await api('/api/connect', { method: 'POST', body: JSON.stringify({ token }) });
+    $('tokenInput').value = '';
+    await loadConfig();
+    toast('Notion 已连接');
+    await scan();
+  } catch (e) {
+    $('connectMsg').textContent = e.message;
+  } finally {
+    $('connectBtn').disabled = false;
+  }
+}
+
+async function disconnect() {
+  try {
+    await api('/api/disconnect', { method: 'POST', body: '{}' });
+  } catch (e) { /* ignore */ }
+  state.roots = [];
+  state.selected.clear();
+  await loadConfig();
+  renderTree();
+  toast('已断开');
+}
+
+async function scan() {
+  if (!state.config || !state.config.notion_connected) return toast('请先连接 Notion');
+  $('scanBtn').disabled = true;
+  $('scanMsg').textContent = '扫描中…';
+  try {
+    const data = await api('/api/scan');
+    state.roots = data.roots || [];
+    state.selected = new Set(state.roots.map((r) => r.id));
+    renderTree();
+    $('scanMsg').textContent = `${state.roots.length} 个顶层页面 / ${data.total_pages} 页`;
+  } catch (e) {
+    $('scanMsg').textContent = '';
+    toast(e.message);
+    $('tree').innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`;
+  } finally {
+    $('scanBtn').disabled = false;
+  }
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function nodeElement(node, selectable) {
+  const li = document.createElement('li');
+  const row = document.createElement('label');
+  row.className = 'node' + (selectable ? '' : ' child');
+  if (selectable) {
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = state.selected.has(node.id);
+    cb.addEventListener('change', () => {
+      if (cb.checked) state.selected.add(node.id); else state.selected.delete(node.id);
+      updateSummary();
+    });
+    row.appendChild(cb);
+  }
+  const title = document.createElement('span');
+  title.className = 'node-title';
+  title.textContent = node.title;
+  title.title = node.title;
+  row.appendChild(title);
+  const count = document.createElement('span');
+  count.className = 'node-count';
+  count.textContent = `${node.count || 1} 页`;
+  row.appendChild(count);
+  li.appendChild(row);
+  if (node.children && node.children.length) {
+    const ul = document.createElement('ul');
+    node.children.forEach((child) => ul.appendChild(nodeElement(child, false)));
+    li.appendChild(ul);
+  }
+  return li;
+}
+
+function renderTree() {
+  const box = $('tree');
+  box.innerHTML = '';
+  if (!state.roots.length) {
+    box.innerHTML = '<div class="empty">连接后点击「扫描 Notion」</div>';
+    updateSummary();
+    return;
+  }
+  const ul = document.createElement('ul');
+  state.roots.forEach((root) => ul.appendChild(nodeElement(root, true)));
+  box.appendChild(ul);
+  updateSummary();
+}
+
+function selectedNodes() {
+  return state.roots.filter((r) => state.selected.has(r.id));
+}
+
+function updateSummary() {
+  const nodes = selectedNodes();
+  const pages = nodes.reduce((sum, n) => sum + (n.count || 1), 0);
+  const box = $('summary');
+  if (!nodes.length) {
+    box.classList.add('hidden');
+    return;
+  }
+  box.classList.remove('hidden');
+  box.innerHTML = `已选 <b>${nodes.length}</b> 个顶层页面，共 <b>${pages}</b> 页；子页面和图片会一起迁移。`;
+}
+
+async function startJob() {
+  const nodes = selectedNodes();
+  if (!nodes.length) return toast('至少选择一个页面');
+  if (!state.config || !state.config.lark_user_ready) {
+    return toast('先完成 lark-cli user 授权（见右侧提示）');
+  }
+  const target = document.querySelector('input[name=target]:checked').value;
+  const body = {
+    roots: nodes.map((n) => n.id),
+    target,
+    space_id: $('spaceId').value.trim() || 'my_library',
+    folder_token: $('folderToken').value.trim(),
+    base_url: $('baseUrl').value.trim() || 'https://feishu.cn',
+    container_title: $('containerTitle').value.trim(),
+  };
+  $('startBtn').disabled = true;
+  try {
+    const res = await api('/api/jobs', { method: 'POST', body: JSON.stringify(body) });
+    state.jobId = res.id;
+    $('jobCard').classList.remove('hidden');
+    $('jobCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    pollJob();
+  } catch (e) {
+    toast(e.message);
+    $('startBtn').disabled = false;
+  }
+}
+
+function renderJob(job) {
+  $('jobTitle').textContent = job.status === 'done' ? '迁移完成' : (job.status === 'failed' ? '迁移失败' : '迁移进度');
+  $('jobPill').textContent = ({ queued: '排队中', running: '运行中', done: '完成', failed: '失败' })[job.status] || job.status;
+  $('jobPill').className = 'pill ' + (job.status === 'done' ? 'ok' : (job.status === 'failed' ? 'bad' : ''));
+  $('progressBar').style.width = `${job.progress || 0}%`;
+  const phase = ({ pulling: '拉取 Notion', preparing: '准备本地文件', pushing: '写入飞书', done: '完成', failed: '失败', queued: '排队' })[job.phase] || job.phase;
+  $('jobStatus').textContent = `${phase} · ${job.progress || 0}%` + (job.total ? ` · ${job.done || 0}/${job.total}` : '');
+  $('jobMessage').textContent = job.status === 'failed' ? (job.error || job.message || '迁移失败') : (job.message || '');
+  $('logBox').textContent = (job.logs || []).slice(-120).join('\n');
+
+  if (job.status === 'done' && job.result) {
+    $('resultBox').classList.remove('hidden');
+    $('statPages').textContent = job.result.pages || 0;
+    $('statImages').textContent = job.result.images || 0;
+    $('statDbs').textContent = (job.result.databases || []).length;
+    const links = $('rootLinks');
+    links.innerHTML = '';
+    const errs = job.result.errors || [];
+    $('resultErrors').textContent = errs.length ? `⚠ ${errs.length} 个页面/资源失败，详见日志` : '';
+    (job.result.root_links || []).forEach((item) => {
+      const a = document.createElement('a');
+      a.href = item.url;
+      a.target = '_blank';
+      a.rel = 'noreferrer';
+      a.textContent = `${item.title} ↗`;
+      links.appendChild(a);
+    });
+    $('startBtn').disabled = false;
+  }
+  if (job.status === 'failed') {
+    $('startBtn').disabled = false;
+  }
+}
+
+async function pollJob() {
+  if (!state.jobId) return;
+  try {
+    const job = await api(`/api/jobs/${state.jobId}`);
+    renderJob(job);
+    if (job.status === 'done' || job.status === 'failed') {
+      clearTimeout(state.timer);
+      return;
+    }
+  } catch (e) {
+    toast(e.message);
+  }
+  state.timer = setTimeout(pollJob, 1200);
+}
+
+$('connectBtn').addEventListener('click', connect);
+$('disconnectBtn').addEventListener('click', disconnect);
+$('scanBtn').addEventListener('click', scan);
+$('selectAllBtn').addEventListener('click', () => {
+  state.selected = new Set(state.roots.map((r) => r.id));
+  renderTree();
+});
+$('selectNoneBtn').addEventListener('click', () => {
+  state.selected.clear();
+  renderTree();
+});
+$('startBtn').addEventListener('click', startJob);
+document.querySelectorAll('input[name=target]').forEach((el) => el.addEventListener('change', toggleTarget));
+
+loadConfig().then(() => {
+  if (state.config.notion_connected) scan();
+}).catch((e) => toast(e.message));
+</script>
+</body>
+</html>

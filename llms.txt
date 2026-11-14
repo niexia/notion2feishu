@@ -1,0 +1,24 @@
+# notion2feishu
+
+> Migrate Notion pages to Feishu (Lark) docs, preserving hierarchy, images, and page links.
+
+## Install
+
+- `pipx install .` (from this repo)
+- or `npx --yes github:niexia/notion2feishu`
+- Requires Python 3.9+ and `lark-cli` logged in as a user.
+
+## Commands
+
+- `notion2feishu` — local Web wizard (connect, select, run)
+- `notion2feishu scan --json` — list accessible Notion roots
+- `notion2feishu pull --page <url> --out <dir> --json` — pull Notion to local Markdown
+- `notion2feishu migrate --notion-page <url> --target wiki --space-id my_library` — end-to-end
+- `notion2feishu migrate --src export.zip` — local export path
+- `notion2feishu doctor` — auth diagnostics
+
+## Safety
+
+- Tokens only via `NOTION_TOKEN` env or local config.
+- Always dry-run before writing; never delete Feishu docs.
+- See `AGENTS.md` and `README.md`.

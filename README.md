@@ -2,47 +2,65 @@
 
 [![test](https://github.com/niexia/notion2feishu/actions/workflows/ci.yml/badge.svg)](https://github.com/niexia/notion2feishu/actions/workflows/ci.yml)
 
-把 **Notion 导出**迁移到 **飞书云文档**：保留父子层级、本地图片、页间链接。
+把 **Notion** 迁移到 **飞书云文档**：保留父子层级、本地图片、页间链接。
 
-一条命令跑完：自动找导出、自动解压、自动检查授权、默认迁到「我的文档库」。
+两种来源：
 
-> English: `pipx install notion2feishu` → `notion2feishu` (interactive wizard) or
-> `notion2feishu migrate --src export.zip --yes`.
+- **Notion API 直连（推荐）**：不用手动导出，选页面即可；
+- **本地导出**：`.zip` / Markdown 目录（兼容旧流程）。
 
----
-
-## 快速开始
+## 快速开始（Web 向导）
 
 ```bash
-# 1. 安装（任选一种）
-pipx install notion2feishu          # 发布后
-# pipx install .                    # 从源码安装
-# uv tool install notion2feishu     # 或用 uv
+# 1. 安装
+pipx install .                 # 或 pipx install notion2feishu（发布后）
 
-# 2. 一次性授权（需要 lark-cli）
+# 2. 飞书授权
 lark-cli auth login --domain docs,drive,wiki,base
 
-# 3. 迁移
+# 3. 打开向导
 notion2feishu
-
-# 或者不安装，直接用 npx（需要 Node + Python 3.9+）
-npx --yes github:niexia/notion2feishu
 ```
 
-`notion2feishu` 不带参数时会：
+浏览器会打开 `http://127.0.0.1:...`：
 
-1. 在**当前目录 / Downloads / Desktop** 里找最近的 Notion 导出（`.zip` 或解压后的目录）；
-2. 问一次你的飞书域名（如 `https://acme.feishu.cn`，回车用 `https://feishu.cn`），并记住；
-3. 显示源、目标、页面数，确认后开始迁移；
-4. 默认迁到**我的文档库**（`my_library`），保留 Notion 的页面树。
+1. 粘贴 Notion Integration Token；
+2. 扫描并勾选顶层页面（如 `Work tutorial` / `Engineer`）；
+3. 选「我的文档库」或知识库/云盘；
+4. 预览后开始，后台迁移，完成看根页面链接。
 
-也可以显式指定：
+> 不安装也可以：`npx --yes github:niexia/notion2feishu`（需要 Node + Python 3.9+）。
+
+### 连接 Notion（一次性）
+
+1. 打开 <https://www.notion.so/my-integrations> → **New integration**；
+2. 复制 Internal Integration Token；
+3. 打开 Notion 根页面 → `•••` → `Connections` → 连接这个 integration；
+4. 在向导里粘贴 token（只保存在本机 `~/.notion2feishu/config.json`，权限 600）。
+
+### API 直连的边界
+
+- 页面、子页面、图片、附件会自动拉取；
+- 数据库在页面里只保留链接（多维表格在后续版本）；
+- 单页约 20,000 blocks 会截断，工具会尝试补拉 `unknown_block_ids`；
+- 图片是预签名 URL，`pull` 时会立即下载，过期后重跑即可；
+- Notion 限流约 3 请求/秒，工具会自动退避。
+
+### CLI / Agent
+
+```bash
+export NOTION_TOKEN=ntn_xxx
+
+notion2feishu scan --json
+notion2feishu pull --page "https://www.notion.so/..." --out ./notion-export
+notion2feishu migrate --notion-page "https://www.notion.so/..." --yes
+```
+
+旧的本地导出流程仍然可用：
 
 ```bash
 notion2feishu migrate --src ~/Downloads/ExportBlock-xxxx.zip --yes
 ```
-
-`--yes` 会跳过确认，适合脚本；如果没传 `--base-url`，会使用之前记住的域名。
 
 ---
 
@@ -59,7 +77,7 @@ notion2feishu migrate --src ~/Downloads/ExportBlock-xxxx.zip --yes
 原理只有三步：
 
 ```text
-Notion 导出
+Notion API / 本地导出
   └─ 1. 建空节点树（wiki +node-create / drive +create-folder）
        └─ 2. 写正文（docs +update，图片自动上传）
             └─ 3. 全部建完后回填页间链接
@@ -118,25 +136,21 @@ python3 -m pip install --upgrade pip
 ## 常用命令
 
 ```bash
-# 向导：自动找导出 + 确认 + 迁移
+# Web 向导（推荐）
 notion2feishu
+notion2feishu ui --port 8765
 
-# 显式指定 zip / 目录
-notion2feishu migrate --src ~/Downloads/ExportBlock-xxxx.zip
+# Notion API 直连
+notion2feishu scan --json
+notion2feishu pull --page <url> --out ./notion-export
+notion2feishu migrate --notion-page <url> --yes
 
-# 只看树，不写飞书
-notion2feishu plan --src ~/Downloads/ExportBlock-xxxx.zip
+# 本地导出
+notion2feishu plan --src export.zip
+notion2feishu migrate --src export.zip
 
-# 检查 lark-cli 授权与 wiki 权限
+# 检查 / 调试
 notion2feishu doctor
-
-# 只做本地准备（清洗 md、复制图片、生成 manifest）
-notion2feishu prepare --src ~/Downloads/ExportBlock-xxxx.zip --out ./work
-
-# 在已有工作目录上继续/重跑
-notion2feishu push --work ./work --target wiki --space-id my_library
-
-# 版本
 notion2feishu version
 ```
 
@@ -144,7 +158,10 @@ notion2feishu version
 
 | 参数 | 说明 |
 |---|---|
-| `--src` | 导出 `.zip` 或目录；省略时自动找最近的 |
+| `--src` | 本地导出 `.zip` 或目录；省略时自动找最近的 |
+| `--notion-page` | Notion 页面 URL/ID，可重复；传了它就不需要 `--src` |
+| `--notion-token` | Notion Integration Token；默认读 `NOTION_TOKEN` |
+| `--pull-limit` | 只从 Notion 拉前 N 页（调试） |
 | `--target wiki\|drive` | 默认 `wiki`；传 `--folder-token` 时自动切到 `drive` |
 | `--space-id` | Wiki 空间；默认 `my_library`（个人文档库） |
 | `--parent-node-token` | 挂到某个已有 Wiki 节点下 |
@@ -309,7 +326,11 @@ work/
 | `user 身份不可用` | 按提示运行 `lark-cli auth login --domain docs,drive,wiki,base` |
 | 授权页「当前无需开通…」 | 在普通终端重跑 login；见「授权」一节 |
 | `21001 access denied` | 当前身份没有 wiki 权限，或被租户数据安全策略拦截 |
-| 图片 403 / 404 | 检查 `assets/<page_id>/` 是否完整；重新 `prepare --force` |
+| Notion `401` / token 无效 | 重新复制 token；确认 integration 存在 |
+| Notion 拉取 0 页 | integration 没有连接到根页面；在 Notion `••• → Connections` 里连接 |
+| Notion 图片 403 | 预签名 URL 过期；重跑 `pull` / `migrate` |
+| 数据库没迁 | 页面里的 `<database>` 只保留链接；多维表格在后续版本 |
+| 图片 403 / 404（本地） | 检查 `assets/<page_id>/` 是否完整；重新 `prepare --force` |
 | 同一篇出现两次 | 没走 `--resume` 重跑了；删掉重复节点，或 `--fresh` 换工作目录 |
 | `232140101` / `233523001` | 同目录并发冲突；本工具已串行，仍出现就把 `--sleep` 调到 1.5 |
 | 长文档写一半失败 | `--limit` 缩小范围；或把该页拆成两篇后手动补 |
@@ -342,14 +363,35 @@ python3 notion2feishu.py --help
 
 ```text
 src/notion2feishu/
-├── cli.py       # 参数、向导、自动找导出/解压、授权
-└── core.py      # 扫描、清洗、改写、lark-cli 调用
+├── cli.py       # 参数、向导、授权
+├── core.py      # 扫描、清洗、改写、lark-cli 调用
+├── notion.py    # Notion API 客户端、pull、Markdown 归一化
+├── web.py       # 本地 Web 服务 + SQLite 任务
+└── ui.html      # 向导前端
 tests/
 ```
 
 欢迎 PR。提交前请跑测试；新增行为尽量补一个 fixture 测试。
 
 ---
+
+## Agent 使用
+
+仓库里带了：
+
+- [`AGENTS.md`](AGENTS.md)：给 Codex 等 coding agent 的规则和命令；
+- [`skills/notion2feishu/SKILL.md`](skills/notion2feishu/SKILL.md)：可被 skill 系统加载；
+- [`llms.txt`](llms.txt)：一段式上下文。
+
+Agent 优先用结构化输出：
+
+```bash
+notion2feishu scan --json
+notion2feishu pull --page <url> --out ./notion-export --json
+notion2feishu migrate --notion-page <url> --yes
+```
+
+写操作前必须先 dry-run，并让用户确认目标；工具不提供删除能力。
 
 ## License
 

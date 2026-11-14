@@ -16,7 +16,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import List, NoReturn, Optional, Tuple
 
-from . import core
+from . import core, notion
 
 try:
     from . import __version__
@@ -28,7 +28,7 @@ WORK_ROOT = APP_HOME / "work"
 CACHE_ROOT = APP_HOME / "cache"
 CONFIG_PATH = APP_HOME / "config.json"
 
-KNOWN_COMMANDS = {"migrate", "prepare", "push", "plan", "doctor", "version"}
+KNOWN_COMMANDS = {"migrate", "prepare", "push", "plan", "scan", "pull", "ui", "doctor", "version"}
 
 
 # ---------------------------------------------------------------------------
@@ -322,16 +322,50 @@ def resolve_base_url(args: argparse.Namespace, yes: bool) -> str:
 # 子命令
 # ---------------------------------------------------------------------------
 
+def _rmtree_checked(path: Path) -> None:
+    if path in (Path("/"), Path.home()):
+        fail(f"拒绝删除危险路径：{path}")
+    if path.exists():
+        shutil.rmtree(path)
+
+
+def _notion_client(args: argparse.Namespace) -> notion.NotionClient:
+    try:
+        token = (
+            getattr(args, "notion_token", None)
+            or os.environ.get("NOTION_TOKEN")
+            or load_config().get("notion_token")
+        )
+        return notion.NotionClient(notion.token_from_env_or_arg(token))
+    except notion.NotionError as exc:
+        fail(str(exc))
+
+
 def cmd_migrate(args: argparse.Namespace) -> int:
     ensure_lark()
-    src = resolve_source(args.src)
-    work = Path(args.work).expanduser().resolve() if args.work else default_work(src)
+    if args.src and args.notion_page:
+        fail("--src 和 --notion-page 只能二选一。")
 
     target, space_id, folder_token = resolve_target(args)
     base_url = resolve_base_url(args, args.yes)
 
+    notion_ids: List[str] = []
+    for value in (args.notion_page or []):
+        try:
+            notion_ids.append(notion.page_id_from(value))
+        except notion.NotionError as exc:
+            fail(str(exc))
+
+    if notion_ids:
+        key = hashlib.sha1("|".join(notion_ids).encode("utf-8")).hexdigest()[:12]
+        work = Path(args.work).expanduser().resolve() if args.work else (WORK_ROOT / f"notion-{key}")
+        src = work / "source"
+    else:
+        src = resolve_source(args.src)
+        work = Path(args.work).expanduser().resolve() if args.work else default_work(src)
+
     log("")
-    log(f"源目录    {src}")
+    log(f"源        {src if not notion_ids else 'Notion: ' + ', '.join(notion_ids)}")
     log(f"工作目录  {work}")
     if target == "wiki":
         label = "我的文档库 (my_library)" if space_id == "my_library" else f"知识库 {space_id}"
@@ -343,12 +377,49 @@ def cmd_migrate(args: argparse.Namespace) -> int:
     if not args.dry_run:
         ensure_auth(args.identity, auto_login=not args.no_login, yes=args.yes)
 
-    if not args.dry_run and not args.yes:
+    notion_report = None
+    if notion_ids:
+        client = _notion_client(args)
         try:
+            client.validate()
+        except notion.NotionError as exc:
+            fail(str(exc))
+        if args.fresh:
+            _rmtree_checked(work)
+        if src.exists():
+            shutil.rmtree(src)
+
+        log("\n拉取 Notion（API 直连，不需要手动导出）...")
+
+        def progress(done: int, total: Optional[int], message: str) -> None:
+            log(f"  [{done}] {message}")
+
+        try:
+            notion_report = notion.pull_page_tree(
+                client, notion_ids, src, progress=progress, limit=args.pull_limit
+            )
+        except notion.NotionError as exc:
+            fail(f"拉取失败：{exc}")
+
+        (work / "pull-report.json").write_text(
+            json.dumps(notion_report, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        log(
+            f"拉取完成：{notion_report['total_pages']} 页 / "
+            f"{notion_report['images']} 图 / {notion_report['databases']} 个数据库"
+        )
+        if notion_report["total_pages"] == 0:
+            fail("没有拉到任何页面。请确认 integration 已连接到根页面。")
+        if notion_report.get("errors"):
+            log(f"⚠ {len(notion_report['errors'])} 个页面/资源失败，详见 pull-report.json")
+
+    if not args.dry_run and not args.yes:
+        if notion_report is not None:
+            page_count = notion_report["total_pages"]
+        else:
             pages, _ = core.discover(src)
-        except SystemExit:
-            raise
-        log(f"页面数    {len(pages)}")
+            page_count = len(pages)
+        log(f"页面数    {page_count}")
         try:
             ans = input("\n开始迁移？[y/N] ").strip().lower()
         except EOFError:
@@ -360,13 +431,10 @@ def cmd_migrate(args: argparse.Namespace) -> int:
     if args.dry_run:
         log("\n[dry-run] 只准备本地文件并打印命令，不写入飞书。")
 
-    if args.fresh and work.exists():
-        if work in (Path("/"), Path.home()):
-            fail(f"拒绝删除危险路径：{work}")
-        log(f"清空旧工作目录：{work}")
-        shutil.rmtree(work)
+    if not notion_ids and args.fresh:
+        _rmtree_checked(work)
 
-    if not (work / "manifest.json").exists():
+    if notion_ids or not (work / "manifest.json").exists():
         rc = core.cmd_prepare(SimpleNamespace(src=str(src), out=str(work), force=True))
         if rc != 0:
             return rc
@@ -390,6 +458,82 @@ def cmd_migrate(args: argparse.Namespace) -> int:
         base_url=base_url,
     )
     return core.cmd_push(push_args)
+
+
+def cmd_scan(args: argparse.Namespace) -> int:
+    client = _notion_client(args)
+    try:
+        client.validate()
+        data = notion.scan_workspace(client)
+    except notion.NotionError as exc:
+        fail(str(exc))
+
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+
+    if not data["roots"]:
+        fail(
+            "没有扫描到页面。请确认：\n"
+            "  1) integration 已创建；\n"
+            "  2) 根页面已通过 ••• → Connections 连接到 integration。"
+        )
+
+    def show(node: dict, depth: int) -> None:
+        print("  " * depth + f"- {node['title']}  ({node['count']} 页)")
+        for child in node.get("children", []):
+            show(child, depth + 1)
+
+    for root in data["roots"]:
+        show(root, 0)
+    print(f"\n共 {len(data['roots'])} 个顶层页面 / {data['total_pages']} 页")
+    return 0
+
+
+def cmd_pull(args: argparse.Namespace) -> int:
+    client = _notion_client(args)
+    try:
+        client.validate()
+    except notion.NotionError as exc:
+        fail(str(exc))
+
+    ids = []
+    for value in args.page:
+        try:
+            ids.append(notion.page_id_from(value))
+        except notion.NotionError as exc:
+            fail(str(exc))
+
+    out = Path(args.out).expanduser().resolve()
+    if out.exists() and any(out.iterdir()) and not args.force:
+        fail(f"输出目录非空：{out}\n加 --force 覆盖，或换一个 --out")
+
+    def progress(done: int, total: Optional[int], message: str) -> None:
+        if args.json:
+            print(f"[{done}] {message}", file=sys.stderr)
+        else:
+            print(f"  [{done}] {message}", flush=True)
+
+    try:
+        report = notion.pull_page_tree(client, ids, out, progress=progress, limit=args.limit)
+    except notion.NotionError as exc:
+        fail(f"拉取失败：{exc}")
+
+    report_path = out / "pull-report.json"
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    if args.json:
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+    else:
+        print(
+            f"\n完成：{report['total_pages']} 页 / {report['images']} 图 / "
+            f"{report['files']} 附件 / {report['databases']} 个数据库"
+        )
+        if report.get("errors"):
+            print(f"⚠ {len(report['errors'])} 个错误，详见 {report_path}")
+        print(f"本地导出：{out}")
+        print(f"下一步：notion2feishu migrate --src {out}")
+    return 0
 
 
 def cmd_prepare(args: argparse.Namespace) -> int:
@@ -425,6 +569,12 @@ def cmd_push(args: argparse.Namespace) -> int:
 def cmd_plan(args: argparse.Namespace) -> int:
     src = resolve_source(args.src)
     return core.cmd_plan(SimpleNamespace(src=str(src)))
+
+
+def cmd_ui(args: argparse.Namespace) -> int:
+    from . import web
+    web.serve(port=args.port, open_browser=not args.no_open)
+    return 0
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
@@ -464,8 +614,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"notion2feishu {__version__}")
     sub = parser.add_subparsers(dest="command")
 
-    m = sub.add_parser("migrate", help="一条命令完成：找导出 → 准备 → 建树 → 写正文")
+    m = sub.add_parser("migrate", help="一条命令完成：拉取/找导出 → 准备 → 建树 → 写正文")
     m.add_argument("--src", help="导出的 .zip 或目录；省略时自动找最近的导出")
+    m.add_argument("--notion-page", action="append", metavar="URL",
+                   help="Notion 页面 URL/ID；可重复。传了它就不需要手动导出")
+    m.add_argument("--notion-token", help="Notion Integration Token（默认读 NOTION_TOKEN）")
+    m.add_argument("--pull-limit", type=int, help="只从 Notion 拉前 N 页（调试用）")
     m.add_argument("--work", help="工作目录（默认 ~/.notion2feishu/work/<hash>）")
     m.add_argument("--target", choices=["wiki", "drive"], help="默认 wiki（我的文档库）")
     _add_common_push_flags(m)
@@ -486,9 +640,29 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common_push_flags(push)
     push.set_defaults(func=cmd_push)
 
+    scan = sub.add_parser("scan", help="扫描 Notion 工作区，打印可迁移的顶层页面")
+    scan.add_argument("--notion-token", help="Notion Integration Token（默认读 NOTION_TOKEN）")
+    scan.add_argument("--json", action="store_true", help="输出 JSON（给 Agent 用）")
+    scan.set_defaults(func=cmd_scan)
+
+    pull = sub.add_parser("pull", help="从 Notion API 拉取页面到本地（不写飞书）")
+    pull.add_argument("--page", action="append", required=True, metavar="URL",
+                      help="Notion 页面 URL/ID；可重复")
+    pull.add_argument("--out", default="./notion-export", help="本地输出目录")
+    pull.add_argument("--notion-token", help="Notion Integration Token（默认读 NOTION_TOKEN）")
+    pull.add_argument("--limit", type=int, help="只拉前 N 页")
+    pull.add_argument("--force", action="store_true", help="输出目录非空时覆盖")
+    pull.add_argument("--json", action="store_true", help="输出 JSON（给 Agent 用）")
+    pull.set_defaults(func=cmd_pull)
+
     plan = sub.add_parser("plan", help="只扫描，打印页面树")
     plan.add_argument("--src", required=True, help="导出的 .zip 或目录")
     plan.set_defaults(func=cmd_plan)
+
+    ui = sub.add_parser("ui", help="启动本地 Web 向导（浏览器操作）")
+    ui.add_argument("--port", type=int, default=0, help="端口；0 表示随机可用端口")
+    ui.add_argument("--no-open", action="store_true", help="不自动打开浏览器")
+    ui.set_defaults(func=cmd_ui)
 
     doc = sub.add_parser("doctor", help="检查 lark-cli 登录与权限")
     doc.set_defaults(func=cmd_doctor)
@@ -504,7 +678,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     # 极简用法：notion2feishu / notion2feishu xxx.zip / notion2feishu --src xxx.zip
     if not argv:
-        argv = ["migrate"]
+        argv = ["ui"] if sys.stdin.isatty() else ["migrate"]
     elif argv[0] in ("-h", "--help", "--version"):
         pass
     elif argv[0].startswith("-"):

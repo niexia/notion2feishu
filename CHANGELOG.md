@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0
+
+- Notion API 直连：`scan`、`pull`、`migrate --notion-page`，不再需要手动导出。
+- Notion-flavored Markdown 归一化：callout/toggle/columns/page/database/file 等。
+- 本地 Web 向导：连接 Notion、选择页面、选择目标、后台任务、进度与结果链接。
+- `notion2feishu` 无参数在终端打开 Web 向导；非 TTY 仍走 CLI。
+- `AGENTS.md`、`skills/notion2feishu/SKILL.md`、`llms.txt`。
+
 ## 0.1.0
 
 - 一条命令 `notion2feishu`：自动找导出、解压、授权检查、迁移。
