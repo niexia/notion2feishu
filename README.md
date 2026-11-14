@@ -1,5 +1,7 @@
 # notion2feishu
 
+[![test](https://github.com/niexia/notion2feishu/actions/workflows/ci.yml/badge.svg)](https://github.com/niexia/notion2feishu/actions/workflows/ci.yml)
+
 把 **Notion 导出**迁移到 **飞书云文档**：保留父子层级、本地图片、页间链接。
 
 一条命令跑完：自动找导出、自动解压、自动检查授权、默认迁到「我的文档库」。
