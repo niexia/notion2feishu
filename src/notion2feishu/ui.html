@@ -2,224 +2,713 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>notion2feishu · Notion 迁移到飞书</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f3f6fc" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0d13" media="(prefers-color-scheme: dark)">
+<title>notion2feishu · 把 Notion 搬到飞书</title>
 <style>
   :root {
-    --bg: #f5f6f8;
-    --card: #ffffff;
-    --text: #1f2329;
-    --muted: #646a73;
-    --line: #e5e6eb;
-    --blue: #3370ff;
-    --blue-weak: #e8f0ff;
-    --green: #2ea121;
-    --red: #d83931;
-    --orange: #de7802;
-    --radius: 12px;
+    --bg: #f3f6fc;
+    --bg-soft: #e9eff9;
+    --panel: rgba(255, 255, 255, 0.86);
+    --panel-solid: #ffffff;
+    --text: #151a23;
+    --muted: #6b7280;
+    --muted-2: #9aa3b2;
+    --line: #e4e9f2;
+    --line-strong: #d6deeb;
+    --blue: #2f6bff;
+    --blue-2: #7c5cff;
+    --blue-weak: rgba(47, 107, 255, 0.09);
+    --green: #14995c;
+    --green-weak: rgba(20, 153, 92, 0.12);
+    --red: #d64545;
+    --red-weak: rgba(214, 69, 69, 0.1);
+    --amber: #a55b00;
+    --amber-weak: rgba(165, 91, 0, 0.1);
+    --shadow: 0 24px 70px rgba(25, 48, 100, 0.09);
+    --shadow-sm: 0 6px 18px rgba(25, 48, 100, 0.06);
+    --radius: 20px;
+    --radius-sm: 12px;
+    --topbar: rgba(255, 255, 255, 0.72);
+    --console: #0c1017;
+    --console-text: #c9d2e0;
+    --console-line: #222b3a;
   }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0a0d13;
+      --bg-soft: #101622;
+      --panel: rgba(21, 26, 35, 0.86);
+      --panel-solid: #151a23;
+      --text: #eef2f8;
+      --muted: #9aa4b5;
+      --muted-2: #6f7b8e;
+      --line: #242c3a;
+      --line-strong: #313b4d;
+      --blue: #6b96ff;
+      --blue-2: #9b84ff;
+      --blue-weak: rgba(107, 150, 255, 0.14);
+      --green: #4ade9a;
+      --green-weak: rgba(74, 222, 154, 0.12);
+      --red: #ff7b7b;
+      --red-weak: rgba(255, 123, 123, 0.12);
+      --amber: #ffbd66;
+      --amber-weak: rgba(255, 189, 102, 0.12);
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+      --shadow-sm: 0 6px 20px rgba(0, 0, 0, 0.3);
+      --topbar: rgba(10, 13, 19, 0.72);
+      --console: #070a0f;
+      --console-text: #c9d2e0;
+      --console-line: #1d2533;
+    }
+  }
+
   * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; overflow-x: hidden; }
   body {
-    margin: 0; background: var(--bg); color: var(--text);
-    font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    margin: 0;
+    background:
+      radial-gradient(900px 500px at 12% -10%, rgba(47, 107, 255, 0.12), transparent 60%),
+      radial-gradient(800px 450px at 90% 0%, rgba(124, 92, 255, 0.10), transparent 55%),
+      linear-gradient(180deg, var(--bg) 0%, var(--bg-soft) 100%);
+    background-attachment: fixed;
+    color: var(--text);
+    font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
   }
-  header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 18px 28px; background: var(--card); border-bottom: 1px solid var(--line);
-    position: sticky; top: 0; z-index: 5;
+  button, input { font: inherit; }
+  code {
+    background: var(--bg-soft); border: 1px solid var(--line);
+    padding: 1px 5px; border-radius: 5px; font-size: .92em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
-  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; }
-  .logo {
-    width: 28px; height: 28px; border-radius: 8px; background: var(--blue);
-    color: #fff; display: grid; place-items: center; font-size: 14px;
-  }
-  .pill { padding: 4px 10px; border-radius: 999px; font-size: 12px; background: #f2f3f5; color: var(--muted); }
-  .pill.ok { background: #e8f7e6; color: var(--green); }
-  .pill.bad { background: #fde8e7; color: var(--red); }
-  main { max-width: 1180px; margin: 0 auto; padding: 22px 20px 60px; }
-  .card {
-    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-    padding: 20px; margin-bottom: 16px;
-  }
-  .card h2 { margin: 0 0 4px; font-size: 15px; }
-  .card .sub { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
-  .grid { display: grid; grid-template-columns: 1.25fr .9fr; gap: 16px; align-items: start; }
-  @media (max-width: 880px) { .grid { grid-template-columns: 1fr; } }
-  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  input[type=text], input[type=password] {
-    width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px;
-    font: inherit; background: #fff; color: var(--text);
-  }
-  input:focus { outline: 2px solid var(--blue-weak); border-color: var(--blue); }
-  .field { margin-bottom: 12px; }
-  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
-  button {
-    border: 0; border-radius: 8px; padding: 9px 16px; font: inherit; cursor: pointer;
-    background: var(--blue); color: #fff; font-weight: 600;
-  }
-  button.secondary { background: #f2f3f5; color: var(--text); }
-  button.ghost { background: transparent; color: var(--blue); padding: 4px 6px; }
-  button:disabled { opacity: .45; cursor: not-allowed; }
-  .tree { max-height: 420px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
-  .tree ul { list-style: none; margin: 0; padding-left: 18px; }
-  .tree > ul { padding-left: 4px; }
-  .tree li { margin: 2px 0; }
-  .node { display: flex; align-items: center; gap: 7px; padding: 5px 6px; border-radius: 6px; }
-  .node:hover { background: #fafbfc; }
-  .node input { accent-color: var(--blue); }
-  .node-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .node-count { color: var(--muted); font-size: 12px; white-space: nowrap; }
-  .node.child { padding-left: 24px; color: var(--muted); }
-  .node.child .node-title { color: var(--muted); }
-  .empty { color: var(--muted); padding: 18px; text-align: center; }
-  .summary { background: #f8f9fb; border-radius: 8px; padding: 12px 14px; margin: 12px 0; font-size: 13px; }
-  .summary b { color: var(--blue); }
-  .radio-row { display: flex; gap: 16px; margin-bottom: 12px; }
-  .radio-row label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
-  .hint { color: var(--muted); font-size: 12px; }
-  .warn { color: var(--orange); font-size: 12px; }
-  .progress-wrap { margin: 10px 0 6px; }
-  .progress { height: 8px; background: #eef0f3; border-radius: 999px; overflow: hidden; }
-  .progress > div { height: 100%; width: 0; background: var(--blue); transition: width .4s ease; }
-  .job-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .job-status { font-size: 12px; color: var(--muted); }
-  pre.logs {
-    background: #16181d; color: #d7dae0; border-radius: 8px; padding: 12px;
-    max-height: 260px; overflow: auto; font-size: 12px; line-height: 1.5; white-space: pre-wrap;
-  }
-  details summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-top: 10px; }
-  .links a { display: block; padding: 6px 0; color: var(--blue); text-decoration: none; }
-  .links a:hover { text-decoration: underline; }
-  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
-  .stat { background: #f8f9fb; border-radius: 8px; padding: 10px 12px; }
-  .stat b { display: block; font-size: 18px; }
-  .stat span { color: var(--muted); font-size: 12px; }
-  .toast {
-    position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
-    background: #1f2329; color: #fff; padding: 10px 16px; border-radius: 8px;
-    font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 20;
-  }
-  .toast.show { opacity: 1; }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
   .hidden { display: none !important; }
-  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 20px; }
+
+  .page { max-width: 1220px; margin: 0 auto; padding: 0 24px 64px; }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 14px 24px;
+    margin: 0 -24px;
+    background: var(--topbar);
+    backdrop-filter: saturate(160%) blur(18px);
+    -webkit-backdrop-filter: saturate(160%) blur(18px);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .logo {
+    width: 38px; height: 38px; border-radius: 12px; flex: 0 0 auto;
+    background: linear-gradient(135deg, var(--blue), var(--blue-2));
+    color: #fff; display: grid; place-items: center;
+    box-shadow: 0 8px 20px rgba(47, 107, 255, 0.28);
+  }
+  .logo svg { width: 20px; height: 20px; }
+  .brand-name { font-weight: 750; letter-spacing: -0.01em; line-height: 1.2; }
+  .brand-sub { color: var(--muted); font-size: 12px; line-height: 1.3; }
+  .status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border-radius: 999px;
+    background: var(--blue-weak); color: var(--blue);
+    font-size: 12px; font-weight: 600; white-space: nowrap;
+  }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .8; }
+  .pill.ok { background: var(--green-weak); color: var(--green); }
+  .pill.bad { background: var(--red-weak); color: var(--red); }
+  .pill.plain { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  .icon-btn {
+    width: 34px; height: 34px; display: grid; place-items: center;
+    border: 1px solid var(--line); border-radius: 10px;
+    background: var(--panel-solid); color: var(--muted); cursor: pointer;
+  }
+  .icon-btn:hover { color: var(--text); border-color: var(--line-strong); }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 52px 0 26px; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    color: var(--muted); font-size: 12px; font-weight: 650;
+    letter-spacing: .04em; text-transform: uppercase;
+  }
+  .eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px var(--green-weak); }
+  .hero h1 {
+    margin: 14px 0 12px;
+    font-size: clamp(30px, 4.2vw, 48px);
+    line-height: 1.12; letter-spacing: -0.035em; font-weight: 800;
+  }
+  .hero h1 .grad {
+    background: linear-gradient(100deg, var(--blue), var(--blue-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p { margin: 0; max-width: 620px; color: var(--muted); font-size: 15px; overflow-wrap: anywhere; }
+  .hero-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .hero-chips span {
+    padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px;
+    color: var(--muted); font-size: 12px; background: var(--panel);
+  }
+
+  /* ---------- stepper ---------- */
+  .stepper {
+    display: flex; align-items: stretch; gap: 0;
+    list-style: none; margin: 24px 0 18px; padding: 0;
+    border: 1px solid var(--line); border-radius: var(--radius-sm);
+    background: var(--panel); overflow: hidden;
+  }
+  .step { flex: 1; display: flex; align-items: center; gap: 10px; padding: 12px 16px; min-width: 0; position: relative; }
+  .step + .step { border-left: 1px solid var(--line); }
+  .step .num {
+    width: 26px; height: 26px; border-radius: 50%; flex: 0 0 auto;
+    display: grid; place-items: center; font-size: 12px; font-weight: 700;
+    background: var(--bg-soft); color: var(--muted);
+    border: 1px solid var(--line);
+  }
+  .step b { display: block; font-size: 13px; font-weight: 650; white-space: nowrap; }
+  .step small { display: block; color: var(--muted-2); font-size: 11px; white-space: nowrap; }
+  .step.is-active .num { background: linear-gradient(135deg, var(--blue), var(--blue-2)); color: #fff; border-color: transparent; box-shadow: 0 4px 12px rgba(47,107,255,.3); }
+  .step.is-active b { color: var(--text); }
+  .step.is-done .num { background: var(--green-weak); color: var(--green); border-color: transparent; }
+
+  /* ---------- panels ---------- */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    animation: rise .45s cubic-bezier(.2,.8,.2,1) both;
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+  .panel-head h2 { margin: 5px 0 4px; font-size: 18px; letter-spacing: -0.01em; }
+  .panel-head p { margin: 0; color: var(--muted); font-size: 13px; max-width: 560px; }
+  .step-tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--blue);
+  }
+  .step-tag::before { content: ""; width: 14px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, var(--blue), var(--blue-2)); }
+
+  /* ---------- connect ---------- */
+  .connect-panel { margin-bottom: 18px; }
+  .connect-form { display: grid; gap: 12px; }
+  .input-wrap { position: relative; display: flex; }
+  .input-wrap input { padding-right: 64px; }
+  .input-wrap .reveal {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    border: 0; background: transparent; color: var(--muted); cursor: pointer;
+    padding: 6px 8px; border-radius: 6px; font-size: 12px;
+  }
+  .input-wrap .reveal:hover { background: var(--bg-soft); color: var(--text); }
+  .connect-hint { display: flex; gap: 8px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+  .connect-hint svg { flex: 0 0 auto; width: 15px; height: 15px; margin-top: 2px; color: var(--blue); }
+  .form-msg { min-height: 18px; margin-top: 10px; font-size: 12px; color: var(--red); }
+
+  /* ---------- layout ---------- */
+  .layout { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(340px, .85fr); gap: 18px; align-items: start; }
+  .source-panel { min-width: 0; }
+  .target-panel { position: sticky; top: 86px; }
+
+  /* ---------- toolbar / tree ---------- */
+  .toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .chip-btn {
+    border: 1px solid var(--line); background: transparent; color: var(--muted);
+    border-radius: 8px; padding: 5px 9px; font-size: 12px; cursor: pointer;
+  }
+  .chip-btn:hover { color: var(--text); border-color: var(--line-strong); background: var(--bg-soft); }
+  .hint { color: var(--muted-2); font-size: 12px; }
+  .tree {
+    min-height: 160px; max-height: 470px; overflow: auto;
+    border: 1px solid var(--line); border-radius: var(--radius-sm);
+    padding: 6px; background: var(--panel-solid);
+  }
+  .tree::-webkit-scrollbar { width: 8px; }
+  .tree::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 8px; }
+  .empty { min-height: 190px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: var(--muted); padding: 20px; }
+  .empty-icon { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: var(--blue-weak); color: var(--blue); margin-bottom: 10px; }
+  .empty p { margin: 0 0 4px; font-weight: 600; color: var(--text); }
+  .empty small { color: var(--muted-2); }
+
+  .tree ul { list-style: none; margin: 0; padding: 0; }
+  .tree-item + .tree-item { margin-top: 1px; }
+  .tree-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 9px; border-radius: 9px; cursor: default;
+    transition: background .15s ease;
+  }
+  .tree-row.root { cursor: pointer; }
+  .tree-row.root:hover { background: var(--bg-soft); }
+  .tree-row.selected { background: var(--blue-weak); }
+  .tree-row.child { padding-left: 40px; color: var(--muted); }
+  .tree-row.child:hover { background: transparent; }
+  .chev {
+    width: 24px; height: 24px; flex: 0 0 auto; display: grid; place-items: center;
+    border: 0; background: transparent; color: var(--muted-2); border-radius: 6px; cursor: pointer;
+    transition: transform .16s ease, color .16s ease;
+  }
+  .chev:hover { background: var(--line); color: var(--text); }
+  .chev.open { transform: rotate(90deg); }
+  .chev.spacer { opacity: 0; pointer-events: none; }
+  .check { position: relative; display: inline-flex; flex: 0 0 auto; cursor: pointer; }
+  .check input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .check .box {
+    width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--line-strong);
+    background: var(--panel-solid); display: grid; place-items: center; transition: all .15s ease;
+  }
+  .check input:checked + .box { background: linear-gradient(135deg, var(--blue), var(--blue-2)); border-color: transparent; }
+  .check input:checked + .box::after { content: ""; width: 8px; height: 4px; border: 2px solid #fff; border-top: 0; border-right: 0; transform: rotate(-45deg) translate(1px, -1px); }
+  .check input:focus-visible + .box { box-shadow: 0 0 0 3px var(--blue-weak); }
+  .tree-title { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
+  .tree-title .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
+  .tree-title .date { color: var(--muted-2); font-size: 11px; }
+  .tree-row.child .name { font-weight: 400; }
+  .badge {
+    flex: 0 0 auto; padding: 2px 8px; border-radius: 999px;
+    background: var(--bg-soft); color: var(--muted); font-size: 11px; white-space: nowrap;
+  }
+  .tree-row.selected .badge { background: rgba(47,107,255,.14); color: var(--blue); }
+  .tree-children.collapsed { display: none; }
+
+  .summary {
+    margin-top: 12px; padding: 12px 14px; border-radius: 12px;
+    background: var(--blue-weak); color: var(--text); font-size: 13px;
+    border: 1px solid rgba(47,107,255,.14);
+  }
+  .summary b { color: var(--blue); }
+
+  /* ---------- target ---------- */
+  .segmented {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+    padding: 4px; border-radius: 12px; background: var(--bg-soft); margin-bottom: 16px;
+  }
+  .segmented label { position: relative; }
+  .segmented input { position: absolute; opacity: 0; }
+  .segmented span {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 36px; border-radius: 9px; cursor: pointer;
+    color: var(--muted); font-size: 13px; font-weight: 600;
+    transition: all .16s ease;
+  }
+  .segmented input:checked + span { background: var(--panel-solid); color: var(--text); box-shadow: var(--shadow-sm); }
+  .segmented input:focus-visible + span { outline: 2px solid var(--blue); outline-offset: 1px; }
+  .fields { display: grid; gap: 12px; margin-bottom: 12px; }
+  .field { display: block; margin-bottom: 12px; }
+  .field > span { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .field > small { display: block; margin-top: 5px; color: var(--muted-2); font-size: 11px; line-height: 1.5; }
+  input[type=text], input[type=password] {
+    width: 100%; min-height: 40px; padding: 9px 11px;
+    border: 1px solid var(--line-strong); border-radius: 9px;
+    background: var(--panel-solid); color: var(--text);
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  input::placeholder { color: var(--muted-2); }
+  input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-weak); }
+  .advanced { margin: 4px 0 14px; border-top: 1px dashed var(--line); padding-top: 12px; }
+  .advanced summary { cursor: pointer; color: var(--muted); font-size: 12px; font-weight: 600; }
+  .advanced .field { margin-top: 10px; }
+
+  .warn { color: var(--amber); font-size: 12px; line-height: 1.5; margin-top: 10px; }
+
+  /* ---------- buttons ---------- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 42px; padding: 10px 16px; border: 0; border-radius: 10px;
+    cursor: pointer; font-weight: 650; font-size: 14px;
+    transition: transform .12s ease, box-shadow .18s ease, opacity .18s ease;
+    white-space: nowrap;
+  }
+  .btn.primary {
+    background: linear-gradient(135deg, var(--blue), var(--blue-2));
+    color: #fff; box-shadow: 0 8px 20px rgba(47,107,255,.26);
+  }
+  .btn.primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 12px 26px rgba(47,107,255,.32); }
+  .btn.secondary { background: var(--bg-soft); color: var(--text); border: 1px solid var(--line); }
+  .btn.secondary:hover:not(:disabled) { border-color: var(--line-strong); }
+  .btn.block { width: 100%; margin-top: 6px; }
+  .btn.sm { min-height: 34px; padding: 6px 12px; font-size: 12px; border-radius: 8px; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn svg { width: 16px; height: 16px; }
+  .spinner {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.4); border-top-color: #fff;
+    animation: spin .7s linear infinite;
+  }
+  .btn.secondary .spinner { border-color: var(--line-strong); border-top-color: var(--blue); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- job ---------- */
+  .job-panel { margin-top: 18px; }
+  .job-steps {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    list-style: none; margin: 0 0 14px; padding: 0;
+  }
+  .job-steps li {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border-radius: 999px;
+    background: var(--bg-soft); color: var(--muted); font-size: 12px;
+  }
+  .job-steps li::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--line-strong); }
+  .job-steps li.is-active { background: var(--blue-weak); color: var(--blue); }
+  .job-steps li.is-active::before { background: var(--blue); animation: pulse 1.2s ease infinite; }
+  .job-steps li.is-done { background: var(--green-weak); color: var(--green); }
+  .job-steps li.is-done::before { background: var(--green); }
+  @keyframes pulse { 50% { opacity: .35; } }
+
+  .progress-wrap { margin: 6px 0 16px; }
+  .progress { height: 9px; border-radius: 999px; background: var(--bg-soft); overflow: hidden; }
+  .progress > div {
+    height: 100%; width: 0; border-radius: inherit;
+    background: linear-gradient(90deg, var(--blue), var(--blue-2));
+    position: relative; transition: width .5s cubic-bezier(.2,.8,.2,1);
+  }
+  .progress > div::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.4), transparent);
+    animation: shimmer 1.6s infinite;
+  }
+  @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+  .progress-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 7px; color: var(--muted); font-size: 12px; }
+  .progress-meta b { color: var(--text); }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0 12px; }
+  .stat { background: var(--bg-soft); border-radius: 12px; padding: 12px 14px; }
+  .stat b { display: block; font-size: 22px; line-height: 1.2; letter-spacing: -0.02em; }
+  .stat span { color: var(--muted); font-size: 11px; }
+  .links { display: grid; gap: 8px; margin-top: 12px; }
+  .link-card {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--panel-solid);
+  }
+  .link-card .link-icon { width: 30px; height: 30px; border-radius: 8px; background: var(--blue-weak); color: var(--blue); display: grid; place-items: center; flex: 0 0 auto; }
+  .link-card a { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .link-card button { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 5px; border-radius: 6px; }
+  .link-card button:hover { background: var(--bg-soft); color: var(--text); }
+
+  details.logs { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; }
+  details.logs summary { cursor: pointer; color: var(--muted); font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  details.logs summary span { color: var(--muted-2); font-weight: 400; }
+  pre.logs {
+    margin: 10px 0 0; padding: 14px; border-radius: 12px;
+    background: var(--console); color: var(--console-text);
+    border: 1px solid var(--console-line);
+    max-height: 300px; overflow: auto;
+    font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    white-space: pre-wrap; word-break: break-word;
+  }
+
+  /* ---------- mobile bar / footer ---------- */
+  .mobile-bar {
+    display: none;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    background: var(--topbar);
+    backdrop-filter: saturate(160%) blur(18px);
+    -webkit-backdrop-filter: saturate(160%) blur(18px);
+    border-top: 1px solid var(--line);
+    align-items: center; gap: 12px;
+  }
+  .mobile-bar div { min-width: 0; flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .mobile-bar b, .mobile-bar small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mobile-bar b { font-size: 13px; }
+  .mobile-bar small { color: var(--muted); font-size: 11px; }
+  .mobile-bar .btn { flex: 0 0 auto; min-width: 104px; }
+
+  footer { text-align: center; color: var(--muted-2); font-size: 12px; padding: 30px 0 10px; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 88px; transform: translate(-50%, 10px);
+    background: #111722; color: #fff; padding: 10px 16px; border-radius: 10px;
+    font-size: 13px; opacity: 0; pointer-events: none; transition: all .2s ease;
+    z-index: 50; box-shadow: 0 12px 30px rgba(0,0,0,.25); max-width: calc(100vw - 32px);
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 980px) {
+    .layout { grid-template-columns: 1fr; }
+    .target-panel { position: static; }
+  }
+  @media (max-width: 720px) {
+    .page { padding: 0 14px 96px; }
+    .topbar { margin: 0 -14px; padding: 12px 14px; flex-wrap: wrap; row-gap: 8px; }
+    .status { flex: 1 1 100%; justify-content: flex-start; }
+    .brand-sub { display: none; }
+    .logo { width: 34px; height: 34px; border-radius: 10px; }
+    .status { gap: 6px; }
+    .pill { font-size: 11px; padding: 4px 8px; }
+    .hero { padding: 34px 0 20px; }
+    .hero p { font-size: 14px; }
+    .hero-chips { margin-top: 14px; }
+    .stepper { margin: 18px 0 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .stepper::-webkit-scrollbar { display: none; }
+    .step { padding: 9px 8px; gap: 6px; min-width: 0; flex: 1 1 0; }
+    .step small { display: none; }
+    .step b { font-size: 11.5px; }
+    .step .num { width: 24px; height: 24px; font-size: 11px; }
+    .panel { padding: 16px; border-radius: 16px; }
+    .panel-head { margin-bottom: 14px; }
+    .panel-head h2 { font-size: 16px; }
+    .tree { max-height: 54vh; }
+    .stat-grid { gap: 8px; }
+    .stat b { font-size: 19px; }
+    body { background-attachment: scroll; }
+    .mobile-bar { display: flex; width: 100%; gap: 10px; }
+    .mobile-bar .btn { min-width: 92px; padding: 10px 14px; }
+    .target-panel #startBtn { display: none; }
+    .toast { bottom: 96px; }
+    input[type=text], input[type=password] { font-size: 16px; }
+  }
+  @media (max-width: 420px) {
+    .status .pill:first-child { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+    .segmented span { font-size: 12px; }
+    .hero h1 { font-size: 26px; }
+    .hero p { font-size: 13px; }
+    .stepper { margin-left: -2px; margin-right: -2px; }
+    .step { padding: 8px 6px; gap: 5px; }
+    .step b { font-size: 11px; }
+    .step .num { width: 22px; height: 22px; }
+    .panel { padding: 14px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+  }
 </style>
 </head>
 <body>
-<header>
-  <div class="brand"><div class="logo">N</div> notion2feishu</div>
-  <div class="row">
-    <span id="notionPill" class="pill">Notion 未连接</span>
-    <span id="larkPill" class="pill">飞书未授权</span>
-    <button id="disconnectBtn" class="ghost hidden">断开</button>
-  </div>
-</header>
-
-<main>
-  <section id="connectCard" class="card">
-    <h2>① 连接 Notion</h2>
-    <div class="sub">
-      在 <a href="https://www.notion.so/my-integrations" target="_blank" rel="noreferrer">Notion Integrations</a>
-      创建 Internal Integration，复制 token；然后把 integration 连接到你的根页面（••• → Connections）。
-    </div>
-    <div class="field">
-      <label>Notion Integration Token</label>
-      <input id="tokenInput" type="password" placeholder="ntn_..." autocomplete="off">
-    </div>
-    <button id="connectBtn">连接 Notion</button>
-    <div id="connectMsg" class="hint" style="margin-top:8px"></div>
-  </section>
-
-  <div class="grid">
-    <section id="sourceCard" class="card">
-      <h2>② 选择页面</h2>
-      <div class="sub">扫描 integration 可见的顶层页面；当前版本按顶层页面选择，子页面随父页面一起迁移。</div>
-      <div class="row" style="margin-bottom:10px">
-        <button id="scanBtn" class="secondary">扫描 Notion</button>
-        <button id="selectAllBtn" class="ghost">全选</button>
-        <button id="selectNoneBtn" class="ghost">全不选</button>
-        <span id="scanMsg" class="hint"></span>
+<div class="page">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5 12 3l8 2.5v13L12 21l-8-2.5z"/><path d="M12 3v18"/></svg>
       </div>
-      <div id="tree" class="tree"><div class="empty">连接后点击「扫描 Notion」</div></div>
-      <div id="summary" class="summary hidden"></div>
-    </section>
-
-    <section id="targetCard" class="card">
-      <h2>③ 选择目标</h2>
-      <div class="sub">默认进入「我的文档库」，并创建一个总容器节点，避免污染根目录。</div>
-      <div class="radio-row">
-        <label><input type="radio" name="target" value="wiki" checked> 我的文档库 / 知识库</label>
-        <label><input type="radio" name="target" value="drive"> 云盘文件夹</label>
-      </div>
-      <div id="wikiFields">
-        <div class="field">
-          <label>知识库 space_id（个人文档库用 my_library）</label>
-          <input id="spaceId" type="text" value="my_library">
-        </div>
-      </div>
-      <div id="driveFields" class="hidden">
-        <div class="field">
-          <label>云盘目标文件夹 token（fldcn...）</label>
-          <input id="folderToken" type="text" placeholder="fldcn...">
-        </div>
-      </div>
-      <div class="field">
-        <label>飞书域名（用于回填页间链接）</label>
-        <input id="baseUrl" type="text" placeholder="https://acme.feishu.cn">
-      </div>
-      <div class="field">
-        <label>容器节点 / 文件夹名称</label>
-        <input id="containerTitle" type="text">
-      </div>
-      <div id="targetHint" class="hint"></div>
-      <button id="startBtn" style="width:100%;margin-top:12px">开始迁移</button>
-      <div class="warn" id="startWarn" style="margin-top:8px"></div>
-    </section>
-  </div>
-
-  <section id="jobCard" class="card hidden">
-    <div class="job-head">
       <div>
-        <h2 id="jobTitle">迁移进度</h2>
-        <div class="job-status" id="jobStatus"></div>
+        <div class="brand-name">notion2feishu</div>
+        <div class="brand-sub">Notion → Feishu 迁移向导</div>
       </div>
-      <div class="pill" id="jobPill">运行中</div>
     </div>
-    <div class="progress-wrap"><div class="progress"><div id="progressBar"></div></div></div>
-    <div class="hint" id="jobMessage"></div>
-    <div id="resultBox" class="hidden">
-      <div class="stat-grid">
-        <div class="stat"><b id="statPages">0</b><span>页面</span></div>
-        <div class="stat"><b id="statImages">0</b><span>图片</span></div>
-        <div class="stat"><b id="statDbs">0</b><span>数据库（仅链接）</span></div>
-      </div>
-      <div id="rootLinks" class="links"></div>
-      <div id="resultErrors" class="warn"></div>
+    <div class="status">
+      <span id="notionPill" class="pill plain">Notion 未连接</span>
+      <span id="larkPill" class="pill plain">飞书未授权</span>
+      <button id="disconnectBtn" class="icon-btn hidden" title="断开 Notion" aria-label="断开 Notion">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><path d="M12 2v10"/></svg>
+      </button>
     </div>
-    <details>
-      <summary>查看日志</summary>
-      <pre class="logs" id="logBox"></pre>
-    </details>
-  </section>
-</main>
+  </header>
 
-<footer>notion2feishu · 本地运行，token 不上传第三方</footer>
-<div id="toast" class="toast"></div>
+  <main>
+    <section class="hero">
+      <div class="eyebrow"><span class="dot"></span> Notion → 飞书云文档</div>
+      <h1>把 Notion 笔记<br><span class="grad">完整搬到飞书</span></h1>
+      <p>保留父子层级、图片和页间链接。连接 Notion 后勾选页面，剩下的交给后台。</p>
+      <div class="hero-chips">
+        <span>API 直连，无需导出</span>
+        <span>图片自动上传</span>
+        <span>可断点续跑</span>
+      </div>
+    </section>
+
+    <ol class="stepper" id="stepper" aria-label="迁移步骤">
+      <li class="step is-active" data-step="1"><span class="num"></span><div><b>连接 Notion</b><small>一次性 token</small></div></li>
+      <li class="step" data-step="2"><span class="num"></span><div><b>选择页面</b><small>工作区树</small></div></li>
+      <li class="step" data-step="3"><span class="num"></span><div><b>开始迁移</b><small>后台执行</small></div></li>
+    </ol>
+
+    <section id="connectCard" class="panel connect-panel">
+      <div class="panel-head">
+        <div>
+          <span class="step-tag">Step 1</span>
+          <h2>连接 Notion</h2>
+          <p>创建一个 Internal Integration，把 token 粘贴到这里；然后把 integration 连接到要迁移的根页面。</p>
+        </div>
+      </div>
+      <div class="connect-form">
+        <label class="field">
+          <span>Integration Token</span>
+          <div class="input-wrap">
+            <input id="tokenInput" type="password" placeholder="ntn_..." autocomplete="off" spellcheck="false">
+            <button id="toggleTokenBtn" class="reveal" type="button">显示</button>
+          </div>
+          <small>token 只保存在本机 <code>~/.notion2feishu/config.json</code>（权限 600）。</small>
+        </label>
+        <div class="connect-hint">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+          <span>在 <a href="https://www.notion.so/my-integrations" target="_blank" rel="noreferrer">notion.so/my-integrations</a> 创建；打开 Notion 根页面 → <b>•••</b> → <b>Connections</b> → 连接它。</span>
+        </div>
+        <button id="connectBtn" class="btn primary">连接 Notion</button>
+      </div>
+      <div id="connectMsg" class="form-msg"></div>
+    </section>
+
+    <div class="layout">
+      <section id="sourceCard" class="panel source-panel">
+        <div class="panel-head">
+          <div>
+            <span class="step-tag">Step 2</span>
+            <h2>选择页面</h2>
+            <p>扫描 integration 可见的顶层页面。当前版本按顶层页面选择，子页面随父页面一起迁移。</p>
+          </div>
+          <button id="scanBtn" class="btn secondary sm">扫描</button>
+        </div>
+        <div class="toolbar">
+          <button id="selectAllBtn" class="chip-btn" type="button">全选</button>
+          <button id="selectNoneBtn" class="chip-btn" type="button">全不选</button>
+          <button id="expandAllBtn" class="chip-btn" type="button">展开全部</button>
+          <span id="scanMsg" class="hint"></span>
+        </div>
+        <div id="tree" class="tree">
+          <div class="empty">
+            <div class="empty-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 5.5 12 3l8 2.5v13L12 21l-8-2.5z"/><path d="M8 9h8M8 13h5"/></svg>
+            </div>
+            <p>连接后点击「扫描 Notion」</p>
+            <small>只会显示 integration 有权限的顶层页面</small>
+          </div>
+        </div>
+        <div id="summary" class="summary hidden"></div>
+      </section>
+
+      <aside id="targetCard" class="panel target-panel">
+        <div class="panel-head">
+          <div>
+            <span class="step-tag">Step 3</span>
+            <h2>迁移到</h2>
+            <p>默认进入「我的文档库」，并创建一个容器节点，避免污染根目录。</p>
+          </div>
+        </div>
+
+        <div class="segmented" role="radiogroup" aria-label="迁移目标">
+          <label><input type="radio" name="target" value="wiki" checked><span>我的文档库</span></label>
+          <label><input type="radio" name="target" value="drive"><span>云盘文件夹</span></label>
+        </div>
+
+        <div id="wikiFields" class="fields">
+          <label class="field">
+            <span>知识库 space_id</span>
+            <input id="spaceId" type="text" value="my_library" spellcheck="false" autocomplete="off">
+            <small>个人文档库用 <code>my_library</code>；团队知识库填具体 space_id。</small>
+          </label>
+        </div>
+        <div id="driveFields" class="fields hidden">
+          <label class="field">
+            <span>云盘目标文件夹 token</span>
+            <input id="folderToken" type="text" placeholder="fldcn..." spellcheck="false" autocomplete="off">
+            <small>在飞书云盘打开目标文件夹，URL 里的 <code>fldcn...</code> 就是它。</small>
+          </label>
+        </div>
+
+        <label class="field">
+          <span>飞书域名</span>
+          <input id="baseUrl" type="text" placeholder="https://acme.feishu.cn" spellcheck="false" autocomplete="off">
+          <small>用于回填页间链接。打开飞书网页，地址栏里的域名就是它。</small>
+        </label>
+
+        <label class="field">
+          <span>容器节点 / 文件夹名称</span>
+          <input id="containerTitle" type="text" placeholder="Notion 导入 YYYY-MM-DD">
+        </label>
+
+        <details class="advanced">
+          <summary>高级：挂到已有父节点</summary>
+          <label class="field">
+            <span>父节点 token（可选）</span>
+            <input id="parentNodeToken" type="text" placeholder="wikcn... / 节点 token" spellcheck="false" autocomplete="off">
+          </label>
+        </details>
+
+        <div id="targetHint" class="hint"></div>
+        <div id="startWarn" class="warn"></div>
+        <button id="startBtn" class="btn primary block">
+          开始迁移
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </aside>
+    </div>
+
+    <section id="jobCard" class="panel job-panel hidden">
+      <div class="panel-head job-head">
+        <div>
+          <span class="step-tag">Progress</span>
+          <h2 id="jobTitle">迁移进度</h2>
+          <p id="jobStatus">准备中…</p>
+        </div>
+        <span id="jobPill" class="pill">运行中</span>
+      </div>
+
+      <ol class="job-steps" id="jobSteps">
+        <li data-phase="pulling">拉取 Notion</li>
+        <li data-phase="preparing">准备文件</li>
+        <li data-phase="pushing">写入飞书</li>
+        <li data-phase="done">完成</li>
+      </ol>
+
+      <div class="progress-wrap">
+        <div class="progress"><div id="progressBar"></div></div>
+        <div class="progress-meta"><span id="jobMessage">准备中…</span><b id="jobPercent">0%</b></div>
+      </div>
+
+      <div id="resultBox" class="hidden">
+        <div class="stat-grid">
+          <div class="stat"><b id="statPages">0</b><span>页面</span></div>
+          <div class="stat"><b id="statImages">0</b><span>图片</span></div>
+          <div class="stat"><b id="statDbs">0</b><span>数据库（仅链接）</span></div>
+        </div>
+        <div id="rootLinks" class="links"></div>
+        <div id="resultErrors" class="warn"></div>
+      </div>
+
+      <details class="logs">
+        <summary>运行日志 <span id="logCount"></span></summary>
+        <pre class="logs" id="logBox"></pre>
+      </details>
+    </section>
+  </main>
+
+  <footer>notion2feishu · 本地运行 · token 不会上传到第三方</footer>
+</div>
+
+<div id="mobileBar" class="mobile-bar">
+  <div><b id="mobileSummary">未选择页面</b><small id="mobileTarget">迁移到我的文档库</small></div>
+  <button id="mobileStartBtn" class="btn primary">开始</button>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script>
+"use strict";
+
 const $ = (id) => document.getElementById(id);
-const state = { config: null, roots: [], selected: new Set(), jobId: null, timer: null };
+const state = {
+  config: null,
+  roots: [],
+  selected: new Set(),
+  expanded: new Set(),
+  jobId: null,
+  timer: null,
+  scanning: false,
+};
+
+const PHASES = { pulling: "拉取 Notion", preparing: "准备本地文件", pushing: "写入飞书", done: "完成", failed: "失败", queued: "排队" };
+const STEP_PHASES = ["pulling", "preparing", "pushing", "done"];
 
 function toast(message) {
-  const el = $('toast');
+  const el = $("toast");
   el.textContent = message;
-  el.classList.add('show');
-  clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove('show'), 3200);
+  el.classList.add("show");
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove("show"), 3200);
 }
 
 async function api(path, options = {}) {
   const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
     ...options,
   });
   let data = {};
@@ -228,141 +717,239 @@ async function api(path, options = {}) {
   return data;
 }
 
-function setPills() {
-  const notionOk = !!(state.config && state.config.notion_connected);
-  const larkOk = !!(state.config && state.config.lark_user_ready);
-  $('notionPill').textContent = notionOk ? `Notion 已连接 ${state.config.notion_hint || ''}` : 'Notion 未连接';
-  $('notionPill').className = 'pill ' + (notionOk ? 'ok' : '');
-  $('larkPill').textContent = larkOk ? '飞书已授权' : '飞书未授权';
-  $('larkPill').className = 'pill ' + (larkOk ? 'ok' : 'bad');
-  $('disconnectBtn').classList.toggle('hidden', !notionOk);
-  $('connectCard').classList.toggle('hidden', notionOk);
-  if (notionOk) {
-    $('connectMsg').textContent = '已连接；如需更换 token 点右上角「断开」。';
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function formatDate(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
+}
+
+function setStep(active) {
+  document.querySelectorAll(".step").forEach((el) => {
+    const n = Number(el.dataset.step);
+    el.classList.toggle("is-active", n === active);
+    el.classList.toggle("is-done", n < active);
+    const num = el.querySelector(".num");
+    num.textContent = n < active ? "✓" : String(n);
+  });
+}
+
+function busy(button, on, label) {
+  if (!button) return;
+  if (on) {
+    if (!button.dataset.label) button.dataset.label = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = `<span class="spinner"></span>${label || "处理中"}`;
+  } else {
+    button.disabled = false;
+    if (button.dataset.label) {
+      button.innerHTML = button.dataset.label;
+      delete button.dataset.label;
+    }
   }
-  $('startWarn').textContent = larkOk ? '' : '飞书 user 身份未登录：先在终端运行 lark-cli auth login --domain docs,drive,wiki,base';
+}
+
+function setPills() {
+  const cfg = state.config || {};
+  const notionOk = !!cfg.notion_connected;
+  const larkOk = !!cfg.lark_user_ready;
+  const np = $("notionPill");
+  np.className = "pill " + (notionOk ? "ok" : "plain");
+  np.textContent = notionOk ? "Notion 已连接" : "Notion 未连接";
+  np.title = cfg.notion_hint ? `token ${cfg.notion_hint}` : "";
+  const lp = $("larkPill");
+  lp.className = "pill " + (larkOk ? "ok" : "bad");
+  lp.textContent = larkOk ? "飞书已授权" : "飞书未授权";
+  $("disconnectBtn").classList.toggle("hidden", !notionOk);
+  $("connectCard").classList.toggle("hidden", notionOk);
+  $("startWarn").textContent = larkOk ? "" : "飞书 user 身份未登录：先在终端运行 lark-cli auth login --domain docs,drive,wiki,base";
+  updateStartState();
 }
 
 async function loadConfig() {
-  state.config = await api('/api/config');
+  state.config = await api("/api/config");
   setPills();
-  $('spaceId').value = state.config.space_id || 'my_library';
-  $('baseUrl').value = state.config.base_url || '';
-  if (!$('containerTitle').value) {
+  $("spaceId").value = state.config.space_id || "my_library";
+  $("baseUrl").value = state.config.base_url || "";
+  if (!$("containerTitle").value) {
     const d = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    $('containerTitle').value = `Notion 导入 ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const pad = (n) => String(n).padStart(2, "0");
+    $("containerTitle").value = `Notion 导入 ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   }
-  const target = state.config.target === 'drive' ? 'drive' : 'wiki';
-  document.querySelector(`input[name=target][value=${target}]`).checked = true;
+  const target = state.config.target === "drive" ? "drive" : "wiki";
+  const radio = document.querySelector(`input[name=target][value=${target}]`);
+  if (radio) radio.checked = true;
   toggleTarget();
+  setStep(state.config.notion_connected ? 2 : 1);
 }
 
 function toggleTarget() {
-  const target = document.querySelector('input[name=target]:checked').value;
-  $('wikiFields').classList.toggle('hidden', target !== 'wiki');
-  $('driveFields').classList.toggle('hidden', target !== 'drive');
-  $('targetHint').textContent = target === 'wiki'
-    ? '会创建知识库节点；个人文档库不需要额外权限。'
-    : '需要在飞书云盘先建一个文件夹，并填入它的 fldcn token。';
+  const target = document.querySelector("input[name=target]:checked").value;
+  $("wikiFields").classList.toggle("hidden", target !== "wiki");
+  $("driveFields").classList.toggle("hidden", target !== "drive");
+  $("targetHint").textContent = target === "wiki"
+    ? "会创建知识库节点；个人文档库不需要额外权限。"
+    : "需要先在飞书云盘建一个文件夹，并填入它的 fldcn token。";
+  updateStartState();
 }
 
 async function connect() {
-  const token = $('tokenInput').value.trim();
-  if (!token) return toast('请填入 Notion token');
-  $('connectBtn').disabled = true;
-  $('connectMsg').textContent = '验证中…';
+  const token = $("tokenInput").value.trim();
+  if (!token) { toast("请填入 Notion token"); return; }
+  busy($("connectBtn"), true, "连接中");
+  $("connectMsg").textContent = "";
   try {
-    await api('/api/connect', { method: 'POST', body: JSON.stringify({ token }) });
-    $('tokenInput').value = '';
+    await api("/api/connect", { method: "POST", body: JSON.stringify({ token }) });
+    $("tokenInput").value = "";
     await loadConfig();
-    toast('Notion 已连接');
+    toast("Notion 已连接");
     await scan();
   } catch (e) {
-    $('connectMsg').textContent = e.message;
+    $("connectMsg").textContent = e.message;
   } finally {
-    $('connectBtn').disabled = false;
+    busy($("connectBtn"), false);
   }
 }
 
 async function disconnect() {
-  try {
-    await api('/api/disconnect', { method: 'POST', body: '{}' });
-  } catch (e) { /* ignore */ }
+  try { await api("/api/disconnect", { method: "POST", body: "{}" }); } catch (e) { /* ignore */ }
   state.roots = [];
   state.selected.clear();
+  state.expanded.clear();
   await loadConfig();
   renderTree();
-  toast('已断开');
+  setStep(1);
+  toast("已断开 Notion");
 }
 
 async function scan() {
-  if (!state.config || !state.config.notion_connected) return toast('请先连接 Notion');
-  $('scanBtn').disabled = true;
-  $('scanMsg').textContent = '扫描中…';
+  if (!state.config || !state.config.notion_connected) { toast("请先连接 Notion"); return; }
+  if (state.scanning) return;
+  state.scanning = true;
+  busy($("scanBtn"), true, "扫描中");
+  $("scanMsg").textContent = "正在读取工作区…";
   try {
-    const data = await api('/api/scan');
+    const data = await api("/api/scan");
     state.roots = data.roots || [];
     state.selected = new Set(state.roots.map((r) => r.id));
+    state.expanded = new Set(state.roots.length <= 6 ? state.roots.filter((r) => r.children && r.children.length).map((r) => r.id) : []);
     renderTree();
-    $('scanMsg').textContent = `${state.roots.length} 个顶层页面 / ${data.total_pages} 页`;
+    $("scanMsg").textContent = `${state.roots.length} 个顶层页面 / ${data.total_pages} 页`;
+    setStep(2);
+    if (!state.roots.length) {
+      $("tree").innerHTML = `<div class="empty"><div class="empty-icon">!</div><p>没有扫描到页面</p><small>请确认 integration 已连接到根页面</small></div>`;
+    }
   } catch (e) {
-    $('scanMsg').textContent = '';
+    $("scanMsg").textContent = "";
     toast(e.message);
-    $('tree').innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`;
+    $("tree").innerHTML = `<div class="empty"><div class="empty-icon">!</div><p>扫描失败</p><small>${escapeHtml(e.message)}</small></div>`;
   } finally {
-    $('scanBtn').disabled = false;
+    state.scanning = false;
+    busy($("scanBtn"), false);
   }
 }
 
-function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function chevronSvg() {
+  return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
 }
 
-function nodeElement(node, selectable) {
-  const li = document.createElement('li');
-  const row = document.createElement('label');
-  row.className = 'node' + (selectable ? '' : ' child');
-  if (selectable) {
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.checked = state.selected.has(node.id);
-    cb.addEventListener('change', () => {
-      if (cb.checked) state.selected.add(node.id); else state.selected.delete(node.id);
-      updateSummary();
-    });
-    row.appendChild(cb);
-  }
-  const title = document.createElement('span');
-  title.className = 'node-title';
-  title.textContent = node.title;
-  title.title = node.title;
-  row.appendChild(title);
-  const count = document.createElement('span');
-  count.className = 'node-count';
-  count.textContent = `${node.count || 1} 页`;
-  row.appendChild(count);
-  li.appendChild(row);
-  if (node.children && node.children.length) {
-    const ul = document.createElement('ul');
-    node.children.forEach((child) => ul.appendChild(nodeElement(child, false)));
-    li.appendChild(ul);
-  }
-  return li;
+function toggleExpand(id) {
+  if (state.expanded.has(id)) state.expanded.delete(id); else state.expanded.add(id);
+  const top = $("tree").scrollTop;
+  renderTree();
+  $("tree").scrollTop = top;
 }
 
 function renderTree() {
-  const box = $('tree');
-  box.innerHTML = '';
+  const box = $("tree");
+  box.innerHTML = "";
   if (!state.roots.length) {
-    box.innerHTML = '<div class="empty">连接后点击「扫描 Notion」</div>';
+    box.innerHTML = '<div class="empty"><div class="empty-icon">✦</div><p>连接后点击「扫描 Notion」</p><small>只会显示 integration 有权限的顶层页面</small></div>';
     updateSummary();
+    updateExpandLabel();
     return;
   }
-  const ul = document.createElement('ul');
+  const ul = document.createElement("ul");
   state.roots.forEach((root) => ul.appendChild(nodeElement(root, true)));
   box.appendChild(ul);
   updateSummary();
+  updateExpandLabel();
+}
+
+function nodeElement(node, isRoot) {
+  const li = document.createElement("li");
+  li.className = "tree-item";
+  const row = document.createElement("div");
+  row.className = "tree-row " + (isRoot ? "root" : "child") + (isRoot && state.selected.has(node.id) ? " selected" : "");
+
+  const hasChildren = node.children && node.children.length > 0;
+  if (isRoot) {
+    const chev = document.createElement("button");
+    chev.type = "button";
+    chev.className = "chev" + (state.expanded.has(node.id) ? " open" : "");
+    chev.innerHTML = chevronSvg();
+    chev.setAttribute("aria-label", state.expanded.has(node.id) ? "收起" : "展开");
+    chev.addEventListener("click", (e) => { e.stopPropagation(); if (hasChildren) toggleExpand(node.id); });
+    row.appendChild(chev);
+
+    const label = document.createElement("label");
+    label.className = "check";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = state.selected.has(node.id);
+    cb.addEventListener("change", () => {
+      if (cb.checked) state.selected.add(node.id); else state.selected.delete(node.id);
+      row.classList.toggle("selected", cb.checked);
+      updateSummary();
+    });
+    const box = document.createElement("span");
+    box.className = "box";
+    label.append(cb, box);
+    row.appendChild(label);
+  } else {
+    const spacer = document.createElement("span");
+    spacer.className = "chev spacer";
+    row.appendChild(spacer);
+  }
+
+  const title = document.createElement("div");
+  title.className = "tree-title";
+  const name = document.createElement("span");
+  name.className = "name";
+  name.textContent = node.title || "Untitled";
+  name.title = node.title || "Untitled";
+  title.appendChild(name);
+  if (node.last_edited_time) {
+    const date = document.createElement("span");
+    date.className = "date";
+    date.textContent = "编辑于 " + formatDate(node.last_edited_time);
+    title.appendChild(date);
+  }
+  row.appendChild(title);
+
+  const badge = document.createElement("span");
+  badge.className = "badge";
+  badge.textContent = `${node.count || 1} 页`;
+  row.appendChild(badge);
+
+  row.addEventListener("click", (e) => {
+    if (!isRoot) return;
+    if (e.target.closest("button, label, input")) return;
+    if (hasChildren) toggleExpand(node.id);
+  });
+  li.appendChild(row);
+
+  if (hasChildren) {
+    const children = document.createElement("ul");
+    children.className = "tree-children" + (state.expanded.has(node.id) ? "" : " collapsed");
+    node.children.forEach((child) => children.appendChild(nodeElement(child, false)));
+    li.appendChild(children);
+  }
+  return li;
 }
 
 function selectedNodes() {
@@ -372,75 +959,147 @@ function selectedNodes() {
 function updateSummary() {
   const nodes = selectedNodes();
   const pages = nodes.reduce((sum, n) => sum + (n.count || 1), 0);
-  const box = $('summary');
+  const box = $("summary");
   if (!nodes.length) {
-    box.classList.add('hidden');
-    return;
+    box.classList.add("hidden");
+  } else {
+    box.classList.remove("hidden");
+    box.innerHTML = `已选 <b>${nodes.length}</b> 个顶层页面，共 <b>${pages}</b> 页；子页面和图片会一起迁移。`;
   }
-  box.classList.remove('hidden');
-  box.innerHTML = `已选 <b>${nodes.length}</b> 个顶层页面，共 <b>${pages}</b> 页；子页面和图片会一起迁移。`;
+  $("mobileSummary").textContent = nodes.length ? `已选 ${nodes.length} 个页面 · ${pages} 页` : "未选择页面";
+  updateStartState();
+}
+
+function updateExpandLabel() {
+  const expandable = state.roots.filter((r) => r.children && r.children.length);
+  const allOpen = expandable.length > 0 && expandable.every((r) => state.expanded.has(r.id));
+  $("expandAllBtn").textContent = allOpen ? "收起全部" : "展开全部";
+}
+
+function updateStartState() {
+  const hasPages = selectedNodes().length > 0;
+  const larkOk = !!(state.config && state.config.lark_user_ready);
+  const disabled = !hasPages || !larkOk;
+  $("startBtn").disabled = disabled;
+  $("mobileStartBtn").disabled = disabled;
+  const target = document.querySelector("input[name=target]:checked");
+  if (!larkOk) {
+    $("mobileTarget").textContent = "飞书未授权，先登录";
+  } else {
+    $("mobileTarget").textContent = target && target.value === "drive" ? "迁移到云盘文件夹" : "迁移到我的文档库";
+  }
+}
+
+function globalExpand() {
+  const expandable = state.roots.filter((r) => r.children && r.children.length);
+  const allOpen = expandable.length > 0 && expandable.every((r) => state.expanded.has(r.id));
+  if (allOpen) {
+    state.expanded.clear();
+  } else {
+    state.expanded = new Set(expandable.map((r) => r.id));
+  }
+  const top = $("tree").scrollTop;
+  renderTree();
+  $("tree").scrollTop = top;
 }
 
 async function startJob() {
   const nodes = selectedNodes();
-  if (!nodes.length) return toast('至少选择一个页面');
-  if (!state.config || !state.config.lark_user_ready) {
-    return toast('先完成 lark-cli user 授权（见右侧提示）');
-  }
-  const target = document.querySelector('input[name=target]:checked').value;
+  if (!nodes.length) { toast("至少选择一个页面"); return; }
+  if (!state.config || !state.config.lark_user_ready) { toast("先完成 lark-cli user 授权（见右侧提示）"); return; }
+  const target = document.querySelector("input[name=target]:checked").value;
+  if (target === "drive" && !$("folderToken").value.trim()) { toast("请填云盘文件夹 token"); return; }
   const body = {
     roots: nodes.map((n) => n.id),
     target,
-    space_id: $('spaceId').value.trim() || 'my_library',
-    folder_token: $('folderToken').value.trim(),
-    base_url: $('baseUrl').value.trim() || 'https://feishu.cn',
-    container_title: $('containerTitle').value.trim(),
+    space_id: $("spaceId").value.trim() || "my_library",
+    folder_token: $("folderToken").value.trim(),
+    base_url: $("baseUrl").value.trim() || "https://feishu.cn",
+    container_title: $("containerTitle").value.trim(),
+    parent_node_token: $("parentNodeToken").value.trim(),
   };
-  $('startBtn').disabled = true;
+  busy($("startBtn"), true, "启动中");
+  busy($("mobileStartBtn"), true, "启动中");
   try {
-    const res = await api('/api/jobs', { method: 'POST', body: JSON.stringify(body) });
+    const res = await api("/api/jobs", { method: "POST", body: JSON.stringify(body) });
     state.jobId = res.id;
-    $('jobCard').classList.remove('hidden');
-    $('jobCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $("jobCard").classList.remove("hidden");
+    setStep(3);
+    $("jobCard").scrollIntoView({ behavior: "smooth", block: "start" });
     pollJob();
   } catch (e) {
     toast(e.message);
-    $('startBtn').disabled = false;
+    busy($("startBtn"), false);
+    busy($("mobileStartBtn"), false);
   }
 }
 
-function renderJob(job) {
-  $('jobTitle').textContent = job.status === 'done' ? '迁移完成' : (job.status === 'failed' ? '迁移失败' : '迁移进度');
-  $('jobPill').textContent = ({ queued: '排队中', running: '运行中', done: '完成', failed: '失败' })[job.status] || job.status;
-  $('jobPill').className = 'pill ' + (job.status === 'done' ? 'ok' : (job.status === 'failed' ? 'bad' : ''));
-  $('progressBar').style.width = `${job.progress || 0}%`;
-  const phase = ({ pulling: '拉取 Notion', preparing: '准备本地文件', pushing: '写入飞书', done: '完成', failed: '失败', queued: '排队' })[job.phase] || job.phase;
-  $('jobStatus').textContent = `${phase} · ${job.progress || 0}%` + (job.total ? ` · ${job.done || 0}/${job.total}` : '');
-  $('jobMessage').textContent = job.status === 'failed' ? (job.error || job.message || '迁移失败') : (job.message || '');
-  $('logBox').textContent = (job.logs || []).slice(-120).join('\n');
+function phaseIndex(phase) {
+  const i = STEP_PHASES.indexOf(phase);
+  return i < 0 ? 0 : i;
+}
 
-  if (job.status === 'done' && job.result) {
-    $('resultBox').classList.remove('hidden');
-    $('statPages').textContent = job.result.pages || 0;
-    $('statImages').textContent = job.result.images || 0;
-    $('statDbs').textContent = (job.result.databases || []).length;
-    const links = $('rootLinks');
-    links.innerHTML = '';
+function renderJob(job) {
+  const done = job.status === "done";
+  const failed = job.status === "failed";
+  $("jobTitle").textContent = done ? "迁移完成" : failed ? "迁移失败" : "迁移进度";
+  const pill = $("jobPill");
+  pill.className = "pill " + (done ? "ok" : failed ? "bad" : "plain");
+  pill.textContent = ({ queued: "排队中", running: "运行中", done: "完成", failed: "失败" })[job.status] || job.status;
+
+  const idx = phaseIndex(job.phase);
+  document.querySelectorAll("#jobSteps li").forEach((li, i) => {
+    li.classList.toggle("is-done", done || i < idx);
+    li.classList.toggle("is-active", !done && !failed && i === idx);
+  });
+
+  const pct = Math.max(0, Math.min(100, job.progress || 0));
+  $("progressBar").style.width = `${pct}%`;
+  $("jobPercent").textContent = `${pct}%`;
+  $("jobStatus").textContent = `${PHASES[job.phase] || job.phase || "准备中"}${job.total ? ` · ${job.done || 0}/${job.total}` : ""}`;
+  $("jobMessage").textContent = failed ? (job.error || job.message || "迁移失败") : (job.message || "");
+
+  const logs = job.logs || [];
+  $("logBox").textContent = logs.slice(-160).join("\n");
+  $("logCount").textContent = logs.length ? `${logs.length} 行` : "";
+
+  if (done && job.result) {
+    $("resultBox").classList.remove("hidden");
+    $("statPages").textContent = job.result.pages || 0;
+    $("statImages").textContent = job.result.images || 0;
+    $("statDbs").textContent = (job.result.databases || []).length;
     const errs = job.result.errors || [];
-    $('resultErrors').textContent = errs.length ? `⚠ ${errs.length} 个页面/资源失败，详见日志` : '';
+    $("resultErrors").textContent = errs.length ? `⚠ ${errs.length} 个页面/资源失败，详见日志` : "";
+
+    const links = $("rootLinks");
+    links.innerHTML = "";
     (job.result.root_links || []).forEach((item) => {
-      const a = document.createElement('a');
+      const card = document.createElement("div");
+      card.className = "link-card";
+      const icon = document.createElement("span");
+      icon.className = "link-icon";
+      icon.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.07 0l2-2a5 5 0 0 0-7.07-7.07l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.07 0l-2 2a5 5 0 0 0 7.07 7.07l1.1-1.1"/></svg>';
+      const a = document.createElement("a");
       a.href = item.url;
-      a.target = '_blank';
-      a.rel = 'noreferrer';
-      a.textContent = `${item.title} ↗`;
-      links.appendChild(a);
+      a.target = "_blank";
+      a.rel = "noreferrer";
+      a.textContent = item.title || item.url;
+      const copy = document.createElement("button");
+      copy.type = "button";
+      copy.title = "复制链接";
+      copy.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+      copy.addEventListener("click", async () => {
+        try { await navigator.clipboard.writeText(item.url); toast("已复制链接"); } catch (e) { toast("复制失败"); }
+      });
+      card.append(icon, a, copy);
+      links.appendChild(card);
     });
-    $('startBtn').disabled = false;
   }
-  if (job.status === 'failed') {
-    $('startBtn').disabled = false;
+  if (failed) {
+    $("resultBox").classList.add("hidden");
   }
+  busy($("startBtn"), false);
+  busy($("mobileStartBtn"), false);
 }
 
 async function pollJob() {
@@ -448,8 +1107,9 @@ async function pollJob() {
   try {
     const job = await api(`/api/jobs/${state.jobId}`);
     renderJob(job);
-    if (job.status === 'done' || job.status === 'failed') {
+    if (job.status === "done" || job.status === "failed") {
       clearTimeout(state.timer);
+      state.jobId = null;
       return;
     }
   } catch (e) {
@@ -458,19 +1118,28 @@ async function pollJob() {
   state.timer = setTimeout(pollJob, 1200);
 }
 
-$('connectBtn').addEventListener('click', connect);
-$('disconnectBtn').addEventListener('click', disconnect);
-$('scanBtn').addEventListener('click', scan);
-$('selectAllBtn').addEventListener('click', () => {
+/* ---------- events ---------- */
+$("connectBtn").addEventListener("click", connect);
+$("disconnectBtn").addEventListener("click", disconnect);
+$("scanBtn").addEventListener("click", scan);
+$("selectAllBtn").addEventListener("click", () => {
   state.selected = new Set(state.roots.map((r) => r.id));
   renderTree();
 });
-$('selectNoneBtn').addEventListener('click', () => {
+$("selectNoneBtn").addEventListener("click", () => {
   state.selected.clear();
   renderTree();
 });
-$('startBtn').addEventListener('click', startJob);
-document.querySelectorAll('input[name=target]').forEach((el) => el.addEventListener('change', toggleTarget));
+$("expandAllBtn").addEventListener("click", globalExpand);
+$("startBtn").addEventListener("click", startJob);
+$("mobileStartBtn").addEventListener("click", startJob);
+$("toggleTokenBtn").addEventListener("click", () => {
+  const input = $("tokenInput");
+  const show = input.type === "password";
+  input.type = show ? "text" : "password";
+  $("toggleTokenBtn").textContent = show ? "隐藏" : "显示";
+});
+document.querySelectorAll("input[name=target]").forEach((el) => el.addEventListener("change", toggleTarget));
 
 loadConfig().then(() => {
   if (state.config.notion_connected) scan();

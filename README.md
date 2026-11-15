@@ -64,6 +64,14 @@ notion2feishu migrate --src ~/Downloads/ExportBlock-xxxx.zip --yes
 
 ---
 
+## 界面
+
+| 桌面 | 移动端 |
+|---|---|
+| <img src="https://raw.githubusercontent.com/niexia/notion2feishu/main/docs/screenshot-desktop.png" width="720" alt="桌面向导"> | <img src="https://raw.githubusercontent.com/niexia/notion2feishu/main/docs/screenshot-mobile.png" width="240" alt="移动端向导"> |
+
+向导是本地页面，token 不会上传第三方；桌面、平板和手机都有对应布局。
+
 ## 为什么不用飞书网页直接导入
 
 | | 网页导入 `.md` | Agent 上传 zip | 本工具 |
