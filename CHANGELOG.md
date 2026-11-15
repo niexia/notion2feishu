@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1
+
+- 重新设计 Web 向导：响应式布局、移动端底部操作栏、可折叠页面树、任务阶段进度、暗色模式。
+- README 增加桌面/移动端截图。
+
 ## 0.2.0
 
 - Notion API 直连：`scan`、`pull`、`migrate --notion-page`，不再需要手动导出。

@@ -1,6 +1,6 @@
 {
   "name": "notion2feishu",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Migrate Notion exports to Feishu docs with hierarchy, images and links preserved.",
   "license": "MIT",
   "bin": {
